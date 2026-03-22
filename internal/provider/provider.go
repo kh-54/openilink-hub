@@ -44,7 +44,10 @@ type StartOptions struct {
 type InboundMessage struct {
 	ExternalID   string
 	Sender       string
+	Recipient    string
+	GroupID      string // non-empty for group messages
 	Timestamp    int64
+	MessageState int // 0=new, 1=generating, 2=finish
 	Items        []MessageItem
 	ContextToken string
 	SessionID    string
@@ -56,9 +59,31 @@ type OutboundMessage struct {
 }
 
 type MessageItem struct {
-	Type     string `json:"type"` // "text", "image", "voice", "file", "video"
-	Text     string `json:"text,omitempty"`
-	FileName string `json:"file_name,omitempty"`
+	Type     string  `json:"type"` // "text", "image", "voice", "file", "video"
+	Text     string  `json:"text,omitempty"`
+	FileName string  `json:"file_name,omitempty"`
+	Media    *Media  `json:"media,omitempty"`
+	RefMsg   *RefMsg `json:"ref_msg,omitempty"`
+}
+
+// Media holds CDN media info for image/voice/file/video items.
+type Media struct {
+	URL       string `json:"url,omitempty"`
+	AESKey    string `json:"aes_key,omitempty"`
+	FileSize  int64  `json:"file_size,omitempty"`
+	MediaType string `json:"media_type,omitempty"` // "image", "voice", "file", "video"
+	// Voice-specific
+	PlayTime int `json:"play_time,omitempty"` // seconds
+	// Video-specific
+	PlayLength  int `json:"play_length,omitempty"` // seconds
+	ThumbWidth  int `json:"thumb_width,omitempty"`
+	ThumbHeight int `json:"thumb_height,omitempty"`
+}
+
+// RefMsg represents a quoted/referenced message.
+type RefMsg struct {
+	Title string      `json:"title,omitempty"`
+	Item  MessageItem `json:"item"`
 }
 
 // --- Registry ---

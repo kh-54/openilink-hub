@@ -15,7 +15,10 @@ type MessageData struct {
 	SeqID        int64         `json:"seq_id"`
 	ExternalID   string        `json:"external_id,omitempty"`
 	Sender       string        `json:"sender"`
+	Recipient    string        `json:"recipient,omitempty"`
+	GroupID      string        `json:"group_id,omitempty"`
 	Timestamp    int64         `json:"timestamp"`
+	MessageState int           `json:"message_state,omitempty"` // 0=new, 1=generating, 2=finish
 	Items        []MessageItem `json:"items"`
 	ContextToken string        `json:"context_token,omitempty"`
 	SessionID    string        `json:"session_id,omitempty"`
@@ -29,9 +32,27 @@ type InitData struct {
 }
 
 type MessageItem struct {
-	Type     string `json:"type"` // text, image, voice, file, video
-	Text     string `json:"text,omitempty"`
-	FileName string `json:"file_name,omitempty"`
+	Type     string   `json:"type"` // text, image, voice, file, video
+	Text     string   `json:"text,omitempty"`
+	FileName string   `json:"file_name,omitempty"`
+	Media    *Media   `json:"media,omitempty"`
+	RefMsg   *RefMsg  `json:"ref_msg,omitempty"`
+}
+
+type Media struct {
+	URL         string `json:"url,omitempty"`
+	AESKey      string `json:"aes_key,omitempty"`
+	FileSize    int64  `json:"file_size,omitempty"`
+	MediaType   string `json:"media_type,omitempty"`
+	PlayTime    int    `json:"play_time,omitempty"`
+	PlayLength  int    `json:"play_length,omitempty"`
+	ThumbWidth  int    `json:"thumb_width,omitempty"`
+	ThumbHeight int    `json:"thumb_height,omitempty"`
+}
+
+type RefMsg struct {
+	Title string      `json:"title,omitempty"`
+	Item  MessageItem `json:"item"`
 }
 
 type BotStatusData struct {

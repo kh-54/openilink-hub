@@ -133,36 +133,102 @@ func (p *Provider) Send(ctx context.Context, msg provider.OutboundMessage) (stri
 func convertInbound(msg ilink.WeixinMessage) provider.InboundMessage {
 	var items []provider.MessageItem
 	for _, item := range msg.ItemList {
-		switch item.Type {
-		case ilink.ItemText:
-			if item.TextItem != nil {
-				items = append(items, provider.MessageItem{Type: "text", Text: item.TextItem.Text})
-			}
-		case ilink.ItemImage:
-			items = append(items, provider.MessageItem{Type: "image"})
-		case ilink.ItemVoice:
-			mi := provider.MessageItem{Type: "voice"}
-			if item.VoiceItem != nil {
-				mi.Text = item.VoiceItem.Text
-			}
-			items = append(items, mi)
-		case ilink.ItemFile:
-			mi := provider.MessageItem{Type: "file"}
-			if item.FileItem != nil {
-				mi.FileName = item.FileItem.FileName
-			}
-			items = append(items, mi)
-		case ilink.ItemVideo:
-			items = append(items, provider.MessageItem{Type: "video"})
+		mi := convertItem(item)
+		if mi != nil {
+			items = append(items, *mi)
 		}
 	}
 
 	return provider.InboundMessage{
 		ExternalID:   fmt.Sprintf("%d", msg.MessageID),
 		Sender:       msg.FromUserID,
+		Recipient:    msg.ToUserID,
+		GroupID:      msg.GroupID,
 		Timestamp:    msg.CreateTimeMs,
+		MessageState: int(msg.MessageState),
 		Items:        items,
 		ContextToken: msg.ContextToken,
 		SessionID:    msg.SessionID,
+	}
+}
+
+func convertItem(item ilink.MessageItem) *provider.MessageItem {
+	mi := &provider.MessageItem{}
+
+	switch item.Type {
+	case ilink.ItemText:
+		if item.TextItem == nil {
+			return nil
+		}
+		mi.Type = "text"
+		mi.Text = item.TextItem.Text
+
+	case ilink.ItemImage:
+		mi.Type = "image"
+		if item.ImageItem != nil {
+			mi.Media = convertCDNMedia(item.ImageItem.Media, "image")
+			if mi.Media != nil {
+				if item.ImageItem.URL != "" {
+					mi.Media.URL = item.ImageItem.URL
+				}
+				mi.Media.ThumbWidth = item.ImageItem.ThumbWidth
+				mi.Media.ThumbHeight = item.ImageItem.ThumbHeight
+			}
+		}
+
+	case ilink.ItemVoice:
+		mi.Type = "voice"
+		if item.VoiceItem != nil {
+			mi.Text = item.VoiceItem.Text
+			mi.Media = convertCDNMedia(item.VoiceItem.Media, "voice")
+			if mi.Media != nil {
+				mi.Media.PlayTime = item.VoiceItem.PlayTime
+			}
+		}
+
+	case ilink.ItemFile:
+		mi.Type = "file"
+		if item.FileItem != nil {
+			mi.FileName = item.FileItem.FileName
+			mi.Media = convertCDNMedia(item.FileItem.Media, "file")
+		}
+
+	case ilink.ItemVideo:
+		mi.Type = "video"
+		if item.VideoItem != nil {
+			mi.Media = convertCDNMedia(item.VideoItem.Media, "video")
+			if mi.Media != nil {
+				mi.Media.FileSize = item.VideoItem.VideoSize
+				mi.Media.PlayLength = item.VideoItem.PlayLength
+				mi.Media.ThumbWidth = item.VideoItem.ThumbWidth
+				mi.Media.ThumbHeight = item.VideoItem.ThumbHeight
+			}
+		}
+
+	default:
+		return nil
+	}
+
+	// Convert referenced/quoted message
+	if item.RefMsg != nil && item.RefMsg.MessageItem != nil {
+		refItem := convertItem(*item.RefMsg.MessageItem)
+		if refItem != nil {
+			mi.RefMsg = &provider.RefMsg{
+				Title: item.RefMsg.Title,
+				Item:  *refItem,
+			}
+		}
+	}
+
+	return mi
+}
+
+func convertCDNMedia(m *ilink.CDNMedia, mediaType string) *provider.Media {
+	if m == nil {
+		return nil
+	}
+	return &provider.Media{
+		AESKey:    m.AESKey,
+		MediaType: mediaType,
 	}
 }

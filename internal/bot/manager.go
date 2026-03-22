@@ -141,12 +141,20 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		}
 	}
 
-	payload, _ := json.Marshal(map[string]any{"content": content})
+	payloadMap := map[string]any{"content": content}
+	if msg.GroupID != "" {
+		payloadMap["group_id"] = msg.GroupID
+	}
+	if msg.ContextToken != "" {
+		payloadMap["context_token"] = msg.ContextToken
+	}
+	payload, _ := json.Marshal(payloadMap)
 
 	dbMsg := &database.Message{
 		BotID:     inst.DBID,
 		Direction: "inbound",
 		Sender:    msg.Sender,
+		Recipient: msg.Recipient,
 		MsgType:   msgType,
 		Payload:   payload,
 	}
@@ -156,18 +164,17 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 	// Build relay envelope
 	items := make([]relay.MessageItem, len(msg.Items))
 	for i, item := range msg.Items {
-		items[i] = relay.MessageItem{
-			Type:     item.Type,
-			Text:     item.Text,
-			FileName: item.FileName,
-		}
+		items[i] = convertRelayItem(item)
 	}
 
 	env := relay.NewEnvelope("message", relay.MessageData{
 		SeqID:        seqID,
 		ExternalID:   msg.ExternalID,
 		Sender:       msg.Sender,
+		Recipient:    msg.Recipient,
+		GroupID:      msg.GroupID,
 		Timestamp:    msg.Timestamp,
+		MessageState: msg.MessageState,
 		Items:        items,
 		ContextToken: msg.ContextToken,
 		SessionID:    msg.SessionID,
@@ -232,4 +239,32 @@ func matchFilter(rule database.FilterRule, sender, text, msgType string) bool {
 	}
 
 	return true
+}
+
+func convertRelayItem(item provider.MessageItem) relay.MessageItem {
+	ri := relay.MessageItem{
+		Type:     item.Type,
+		Text:     item.Text,
+		FileName: item.FileName,
+	}
+	if item.Media != nil {
+		ri.Media = &relay.Media{
+			URL:         item.Media.URL,
+			AESKey:      item.Media.AESKey,
+			FileSize:    item.Media.FileSize,
+			MediaType:   item.Media.MediaType,
+			PlayTime:    item.Media.PlayTime,
+			PlayLength:  item.Media.PlayLength,
+			ThumbWidth:  item.Media.ThumbWidth,
+			ThumbHeight: item.Media.ThumbHeight,
+		}
+	}
+	if item.RefMsg != nil {
+		refItem := convertRelayItem(item.RefMsg.Item)
+		ri.RefMsg = &relay.RefMsg{
+			Title: item.RefMsg.Title,
+			Item:  refItem,
+		}
+	}
+	return ri
 }
