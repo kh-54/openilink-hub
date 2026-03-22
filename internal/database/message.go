@@ -144,6 +144,16 @@ func (db *DB) UpdateMessagePayload(id int64, payload json.RawMessage) error {
 	return err
 }
 
+// UpdateMediaPayloads updates all messages with matching bot_id and media_status='downloading'
+// that share the same media_cdn eqp. Used to batch-update bot + channel copies.
+func (db *DB) UpdateMediaPayloads(botID, eqp string, newPayload json.RawMessage) error {
+	_, err := db.Exec(`UPDATE messages SET payload = $1
+		WHERE bot_id = $2 AND payload->>'media_status' = 'downloading'
+		AND payload->'media_cdn'->>'eqp' = $3`,
+		newPayload, botID, eqp)
+	return err
+}
+
 func (db *DB) GetMessagesSince(botID string, afterSeq int64, limit int) ([]Message, error) {
 	if limit <= 0 {
 		limit = 100

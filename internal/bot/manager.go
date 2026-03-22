@@ -220,9 +220,39 @@ func (m *Manager) onStatusChange(inst *Instance, status string) {
 	m.hub.Broadcast(inst.DBID, env)
 }
 
-// onInbound routes an inbound message with filtering, then delivers to sinks.
+// onInbound processes an inbound message in three decoupled phases:
+//  1. Store — save message to DB immediately (+ start async media download)
+//  2. Route — match channels by handle/filter
+//  3. Deliver — fan out to matched channels' sinks
 func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
-	// Determine primary msg type and content for storage
+	parsed := m.parseMessage(msg)
+
+	// Phase 1: Store message (independent of channels)
+	msgID := m.storeMessage(inst, msg, parsed)
+
+	// Phase 1b: Async media download (independent of channels)
+	if parsed.hasMedia && msgID > 0 {
+		go m.downloadMedia(inst, msg, parsed.payloadMap, msgID)
+	}
+
+	// Phase 2: Route to channels
+	matched := m.matchChannels(inst.DBID, msg.Sender, parsed)
+
+	// Phase 3: Deliver to sinks
+	m.deliverToChannels(inst, msg, parsed, matched)
+}
+
+// parsedMessage holds extracted info from an inbound message.
+type parsedMessage struct {
+	msgType    string
+	content    string
+	hasMedia   bool
+	payloadMap map[string]any
+	payload    json.RawMessage
+	relayItems []relay.MessageItem
+}
+
+func (m *Manager) parseMessage(msg provider.InboundMessage) parsedMessage {
 	msgType := "text"
 	content := ""
 	for _, item := range msg.Items {
@@ -243,10 +273,6 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		}
 	}
 
-	_ = m.db.IncrBotMsgCount(inst.DBID)
-
-	// Build payload — save immediately, media downloads async
-	hasMedia := false
 	payloadMap := map[string]any{"content": content}
 	if msg.GroupID != "" {
 		payloadMap["group_id"] = msg.GroupID
@@ -254,6 +280,7 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 	if msg.ContextToken != "" {
 		payloadMap["context_token"] = msg.ContextToken
 	}
+	hasMedia := false
 	for _, item := range msg.Items {
 		if item.Media != nil && item.Media.EncryptQueryParam != "" {
 			payloadMap["media_cdn"] = map[string]string{
@@ -273,96 +300,37 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		items[i] = convertRelayItem(item)
 	}
 
-	// Load channels and route
-	channels, err := m.db.ListChannelsByBot(inst.DBID)
-	if err != nil {
-		slog.Error("load channels failed", "bot", inst.DBID, "err", err)
-		return
-	}
-
-	// Match channels:
-	// - No handle → receives ALL messages
-	// - Has handle → only receives messages with @handle mention
-	var matched []database.Channel
-	mentioned := parseMentions(content)
-	mentionMatched := make(map[string]bool) // track which @handles already matched
-
-	for _, ch := range channels {
-		if ch.Handle == "" {
-			// No handle — always receives (if filter matches)
-			if matchFilter(ch.FilterRule, msg.Sender, content, msgType) {
-				matched = append(matched, ch)
-			}
-		} else if len(mentioned) > 0 && !mentionMatched[strings.ToLower(ch.Handle)] {
-			// Has handle — check if @mentioned (first match only per handle)
-			for _, m := range mentioned {
-				if strings.EqualFold(m, ch.Handle) {
-					matched = append(matched, ch)
-					mentionMatched[strings.ToLower(ch.Handle)] = true
-					break
-				}
-			}
-		}
-	}
-
-	// Save messages and deliver to sinks
-	var savedMsgIDs []int64
-	if len(matched) == 0 {
-		// No channel matched — store without channel_id
-		seqID, _ := m.db.SaveMessage(&database.Message{
-			BotID: inst.DBID, Direction: "inbound", Sender: msg.Sender,
-			Recipient: msg.Recipient, MsgType: msgType, Payload: payload,
-		})
-		savedMsgIDs = append(savedMsgIDs, seqID)
-	} else {
-		for _, ch := range matched {
-			chID := ch.ID
-			seqID, _ := m.db.SaveMessage(&database.Message{
-				BotID: inst.DBID, ChannelID: &chID, Direction: "inbound",
-				Sender: msg.Sender, Recipient: msg.Recipient, MsgType: msgType, Payload: payload,
-			})
-			savedMsgIDs = append(savedMsgIDs, seqID)
-			_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
-
-			env := relay.NewEnvelope("message", relay.MessageData{
-				SeqID: seqID, ExternalID: msg.ExternalID,
-				Sender: msg.Sender, Recipient: msg.Recipient, GroupID: msg.GroupID,
-				Timestamp: msg.Timestamp, MessageState: msg.MessageState,
-				Items: items, ContextToken: msg.ContextToken, SessionID: msg.SessionID,
-			})
-
-			d := sink.Delivery{
-				BotDBID: inst.DBID, Provider: inst.Provider, Channel: ch,
-				Message: msg, Envelope: env, SeqID: seqID, MsgType: msgType, Content: content,
-			}
-			for _, s := range m.sinks {
-				go s.Handle(d)
-			}
-		}
-	}
-
-	// Async media download — always runs if there's media, regardless of channel match
-	if hasMedia && len(savedMsgIDs) > 0 {
-		// Copy payloadMap to avoid concurrent map access with sinks
-		pm := make(map[string]any, len(payloadMap))
-		for k, v := range payloadMap {
-			pm[k] = v
-		}
-		go m.downloadAndUpdateMedia(inst, msg, pm, savedMsgIDs)
+	return parsedMessage{
+		msgType: msgType, content: content, hasMedia: hasMedia,
+		payloadMap: payloadMap, payload: payload, relayItems: items,
 	}
 }
 
-// downloadAndUpdateMedia downloads media files and updates all saved message payloads.
-func (m *Manager) downloadAndUpdateMedia(inst *Instance, msg provider.InboundMessage, payloadMap map[string]any, msgIDs []int64) {
-	// Always update status, even on panic
+// storeMessage saves the message to DB without any channel association.
+func (m *Manager) storeMessage(inst *Instance, msg provider.InboundMessage, p parsedMessage) int64 {
+	_ = m.db.IncrBotMsgCount(inst.DBID)
+	seqID, _ := m.db.SaveMessage(&database.Message{
+		BotID: inst.DBID, Direction: "inbound",
+		Sender: msg.Sender, Recipient: msg.Recipient,
+		MsgType: p.msgType, Payload: p.payload,
+	})
+	return seqID
+}
+
+// downloadMedia downloads media files async and updates ALL stored copies
+// (bot-level + channel-level messages with same media_cdn).
+func (m *Manager) downloadMedia(inst *Instance, msg provider.InboundMessage, payloadMap map[string]any, msgID int64) {
+	// Extract eqp for batch update
+	eqp := ""
+	if cdn, ok := payloadMap["media_cdn"].(map[string]string); ok {
+		eqp = cdn["eqp"]
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("media download panic", "err", r, "bot", inst.DBID)
 			payloadMap["media_status"] = "failed"
-			updated, _ := json.Marshal(payloadMap)
-			for _, id := range msgIDs {
-				m.db.UpdateMessagePayload(id, updated)
-			}
+			m.updateAllMediaCopies(inst.DBID, eqp, payloadMap, msgID)
 		}
 	}()
 
@@ -388,16 +356,86 @@ func (m *Manager) downloadAndUpdateMedia(inst *Instance, msg provider.InboundMes
 		}
 	}
 	if !ok {
-		slog.Error("media download failed: no key or url after processing", "bot", inst.DBID, "msg", msg.ExternalID)
+		slog.Error("media download failed", "bot", inst.DBID, "msg", msg.ExternalID)
 		payloadMap["media_status"] = "failed"
 	} else {
-		slog.Info("media download done", "bot", inst.DBID, "msg", msg.ExternalID, "status", payloadMap["media_status"])
+		slog.Info("media download done", "bot", inst.DBID, "msg", msg.ExternalID)
 	}
 
+	m.updateAllMediaCopies(inst.DBID, eqp, payloadMap, msgID)
+}
+
+// updateAllMediaCopies updates the bot-level message and all channel copies.
+func (m *Manager) updateAllMediaCopies(botDBID, eqp string, payloadMap map[string]any, msgID int64) {
 	updated, _ := json.Marshal(payloadMap)
-	for _, id := range msgIDs {
-		if err := m.db.UpdateMessagePayload(id, updated); err != nil {
-			slog.Error("media payload update failed", "msgID", id, "err", err)
+	// Batch update all messages with same bot + eqp that are still downloading
+	if eqp != "" {
+		if err := m.db.UpdateMediaPayloads(botDBID, eqp, updated); err != nil {
+			slog.Error("media batch update failed", "bot", botDBID, "err", err)
+		}
+	}
+	// Fallback: ensure at least the primary message is updated
+	m.db.UpdateMessagePayload(msgID, updated)
+}
+
+// matchChannels finds channels that should receive this message.
+func (m *Manager) matchChannels(botDBID, sender string, p parsedMessage) []database.Channel {
+	channels, err := m.db.ListChannelsByBot(botDBID)
+	if err != nil {
+		slog.Error("load channels failed", "bot", botDBID, "err", err)
+		return nil
+	}
+
+	var matched []database.Channel
+	mentioned := parseMentions(p.content)
+	mentionMatched := make(map[string]bool)
+
+	for _, ch := range channels {
+		if ch.Handle == "" {
+			if matchFilter(ch.FilterRule, sender, p.content, p.msgType) {
+				matched = append(matched, ch)
+			}
+		} else if len(mentioned) > 0 && !mentionMatched[strings.ToLower(ch.Handle)] {
+			for _, m := range mentioned {
+				if strings.EqualFold(m, ch.Handle) {
+					matched = append(matched, ch)
+					mentionMatched[strings.ToLower(ch.Handle)] = true
+					break
+				}
+			}
+		}
+	}
+	return matched
+}
+
+// deliverToChannels saves per-channel copies and fans out to sinks.
+func (m *Manager) deliverToChannels(inst *Instance, msg provider.InboundMessage, p parsedMessage, matched []database.Channel) {
+	if len(matched) == 0 {
+		return
+	}
+	for _, ch := range matched {
+		chID := ch.ID
+		seqID, _ := m.db.SaveMessage(&database.Message{
+			BotID: inst.DBID, ChannelID: &chID, Direction: "inbound",
+			Sender: msg.Sender, Recipient: msg.Recipient,
+			MsgType: p.msgType, Payload: p.payload,
+		})
+		_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
+
+		env := relay.NewEnvelope("message", relay.MessageData{
+			SeqID: seqID, ExternalID: msg.ExternalID,
+			Sender: msg.Sender, Recipient: msg.Recipient, GroupID: msg.GroupID,
+			Timestamp: msg.Timestamp, MessageState: msg.MessageState,
+			Items: p.relayItems, ContextToken: msg.ContextToken, SessionID: msg.SessionID,
+		})
+
+		d := sink.Delivery{
+			BotDBID: inst.DBID, Provider: inst.Provider, Channel: ch,
+			Message: msg, Envelope: env, SeqID: seqID,
+			MsgType: p.msgType, Content: p.content,
+		}
+		for _, s := range m.sinks {
+			go s.Handle(d)
 		}
 	}
 }
