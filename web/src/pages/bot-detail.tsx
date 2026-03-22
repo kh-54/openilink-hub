@@ -150,13 +150,15 @@ export function BotDetailPage() {
 function ChannelsTab({ botId, channels, onRefresh }: { botId: string; channels: any[]; onRefresh: () => void }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [handle, setHandle] = useState("");
   const [showDocs, setShowDocs] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name) return;
-    await api.createChannel(botId, name);
+    await api.createChannel(botId, name, handle);
     setName("");
+    setHandle("");
     setCreating(false);
     onRefresh();
   }
@@ -165,10 +167,16 @@ function ChannelsTab({ botId, channels, onRefresh }: { botId: string; channels: 
     <div className="space-y-3 mt-4">
       {channels.map((ch) => <ChannelRow key={ch.id} channel={ch} onRefresh={onRefresh} />)}
       {creating ? (
-        <form onSubmit={handleCreate} className="flex gap-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="通道名称" className="h-8 text-sm" autoFocus />
-          <Button type="submit" size="sm">创建</Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setCreating(false)}>取消</Button>
+        <form onSubmit={handleCreate} className="space-y-2">
+          <div className="flex gap-2">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="通道名称" className="h-8 text-sm" autoFocus />
+            <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@提及标识（可选）" className="h-8 text-sm w-40" />
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm">创建</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setCreating(false)}>取消</Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">设置提及标识后，用户发送 @标识 的消息将定向路由到此通道</p>
         </form>
       ) : (
         <Button variant="outline" size="sm" onClick={() => setCreating(true)} className="w-full">
@@ -293,6 +301,9 @@ function ChannelRow({ channel, onRefresh }: { channel: any; onRefresh: () => voi
         <div className="flex items-center gap-2">
           <Cable className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-sm font-medium">{channel.name}</span>
+          {channel.handle && (
+            <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">@{channel.handle}</span>
+          )}
         </div>
         <div className="flex gap-1 shrink-0">
           <Button variant="ghost" size="sm" onClick={async () => { if (confirm("重新生成 Key？")) { await api.rotateKey(channel.id); onRefresh(); } }}>

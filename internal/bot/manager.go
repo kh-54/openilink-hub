@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -11,6 +12,21 @@ import (
 	"github.com/openilink/openilink-hub/internal/provider"
 	"github.com/openilink/openilink-hub/internal/relay"
 )
+
+var mentionRe = regexp.MustCompile(`@(\S+)`)
+
+// parseMentions extracts @handle mentions from text.
+func parseMentions(text string) []string {
+	matches := mentionRe.FindAllStringSubmatch(text, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	var handles []string
+	for _, m := range matches {
+		handles = append(handles, m[1])
+	}
+	return handles
+}
 
 // Manager manages all active bot instances.
 type Manager struct {
@@ -180,13 +196,30 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		SessionID:    msg.SessionID,
 	})
 
-	// Load channels and filter
+	// Load channels and route
 	channels, err := m.db.ListChannelsByBot(inst.DBID)
 	if err != nil {
 		slog.Error("load channels failed", "bot", inst.DBID, "err", err)
 		return
 	}
 
+	// If text contains @handle mentions, route only to mentioned channels
+	mentioned := parseMentions(content)
+	if len(mentioned) > 0 {
+		handleSet := make(map[string]bool, len(mentioned))
+		for _, h := range mentioned {
+			handleSet[strings.ToLower(h)] = true
+		}
+		for _, ch := range channels {
+			if ch.Handle != "" && handleSet[strings.ToLower(ch.Handle)] {
+				m.hub.SendTo(ch.ID, env)
+				_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
+			}
+		}
+		return
+	}
+
+	// No @mention — use regular filter rules
 	for _, ch := range channels {
 		if !matchFilter(ch.FilterRule, msg.Sender, content, msgType) {
 			continue

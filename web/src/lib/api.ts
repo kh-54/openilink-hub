@@ -34,8 +34,8 @@ export const api = {
 
   // Channels
   listChannels: () => request<any[]>("/api/channels"),
-  createChannel: (bot_id: string, name: string) =>
-    request("/api/channels", { method: "POST", body: JSON.stringify({ bot_id, name }) }),
+  createChannel: (bot_id: string, name: string, handle?: string) =>
+    request("/api/channels", { method: "POST", body: JSON.stringify({ bot_id, name, handle: handle || "" }) }),
   deleteChannel: (id: string) => request(`/api/channels/${id}`, { method: "DELETE" }),
   rotateKey: (id: string) => request<{ api_key: string }>(`/api/channels/${id}/rotate-key`, { method: "POST" }),
 

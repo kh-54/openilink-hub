@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS channels (
     id          TEXT PRIMARY KEY,
     bot_id      TEXT NOT NULL,
     name        TEXT NOT NULL,
+    handle      TEXT NOT NULL DEFAULT '',
     api_key     TEXT NOT NULL UNIQUE,
     filter_rule JSONB NOT NULL DEFAULT '{}',
     enabled     BOOLEAN NOT NULL DEFAULT TRUE,
