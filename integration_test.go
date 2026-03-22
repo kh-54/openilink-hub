@@ -1048,28 +1048,16 @@ func TestMentionRouting(t *testing.T) {
 		t.Error("chAll should NOT receive @support")
 	}
 
-	// No mention → all channels
-	ws2.Close()
-	wsAll.Close()
-	ws2 = env.connectWS(t, ch2.APIKey)
-	defer ws2.Close()
-	wsAll = env.connectWS(t, chAll.APIKey)
-	defer wsAll.Close()
-	readWS(t, ws2)
-	readWS(t, wsAll)
-
+	// No mention → first matching channel only (ch1 = "支持", matches first)
 	mock.SimulateInbound(provider.InboundMessage{
 		ExternalID: "2", Sender: "u@wx", Timestamp: time.Now().UnixMilli(),
 		Items: []provider.MessageItem{{Type: "text", Text: "普通消息"}},
 	})
 	if readWSTimeout(t, ws1, 2*time.Second) == nil {
-		t.Error("ch1 should receive non-mention")
+		t.Error("ch1 should receive non-mention (first match)")
 	}
-	if readWSTimeout(t, ws2, 2*time.Second) == nil {
-		t.Error("ch2 should receive non-mention")
-	}
-	if readWSTimeout(t, wsAll, 2*time.Second) == nil {
-		t.Error("chAll should receive non-mention")
+	if readWSTimeout(t, ws2, 300*time.Millisecond) != nil {
+		t.Error("ch2 should NOT receive (only first channel matches)")
 	}
 
 	// @unknown → nobody
@@ -1283,64 +1271,69 @@ func TestAIContextIsolation(t *testing.T) {
 	sender := "user@wechat"
 	ch1ID := ch1.ID
 	ch2ID := ch2.ID
-	payload, _ := json.Marshal(map[string]string{"content": "hello"})
 
-	// Inbound messages (no channel_id, shared across channels)
-	for i := 0; i < 3; i++ {
-		env.db.SaveMessage(&database.Message{
-			BotID: botObj.ID, Direction: "inbound", Sender: sender,
-			MsgType: "text", Payload: payload,
-		})
-	}
+	// Simulate inbound routed to ch1
+	p1, _ := json.Marshal(map[string]string{"content": "help me"})
+	env.db.SaveMessage(&database.Message{
+		BotID: botObj.ID, ChannelID: &ch1ID, Direction: "inbound",
+		Sender: sender, MsgType: "text", Payload: p1,
+	})
 
-	// Outbound from ch1 (AI reply)
-	reply1, _ := json.Marshal(map[string]string{"content": "support reply"})
+	// Simulate inbound routed to ch2
+	p2, _ := json.Marshal(map[string]string{"content": "price?"})
+	env.db.SaveMessage(&database.Message{
+		BotID: botObj.ID, ChannelID: &ch2ID, Direction: "inbound",
+		Sender: sender, MsgType: "text", Payload: p2,
+	})
+
+	// AI reply in ch1
+	r1, _ := json.Marshal(map[string]string{"content": "support reply"})
 	env.db.SaveMessage(&database.Message{
 		BotID: botObj.ID, ChannelID: &ch1ID, Direction: "outbound",
-		Recipient: sender, MsgType: "text", Payload: reply1,
+		Recipient: sender, MsgType: "text", Payload: r1,
 	})
 
-	// Outbound from ch2 (AI reply)
-	reply2, _ := json.Marshal(map[string]string{"content": "sales reply"})
+	// AI reply in ch2
+	r2, _ := json.Marshal(map[string]string{"content": "sales reply"})
 	env.db.SaveMessage(&database.Message{
 		BotID: botObj.ID, ChannelID: &ch2ID, Direction: "outbound",
-		Recipient: sender, MsgType: "text", Payload: reply2,
+		Recipient: sender, MsgType: "text", Payload: r2,
 	})
 
-	// ch1 context: 3 shared inbound + 1 ch1 outbound = 4
-	msgs1, err := env.db.ListChannelMessages(botObj.ID, ch1.ID, sender, 50)
+	// ch1: 1 inbound + 1 outbound = 2
+	msgs1, err := env.db.ListChannelMessages(ch1.ID, sender, 50)
 	if err != nil {
-		t.Fatalf("ListChannelMessages ch1: %v", err)
+		t.Fatalf("ch1: %v", err)
 	}
-	if len(msgs1) != 4 {
-		t.Errorf("ch1 context: want 4, got %d", len(msgs1))
+	if len(msgs1) != 2 {
+		t.Errorf("ch1: want 2, got %d", len(msgs1))
 	}
 	for _, m := range msgs1 {
 		var p struct{ Content string }
 		json.Unmarshal(m.Payload, &p)
-		if p.Content == "sales reply" {
-			t.Error("ch1 should NOT contain sales reply")
+		if p.Content == "sales reply" || p.Content == "price?" {
+			t.Errorf("ch1 should NOT contain ch2 content: %q", p.Content)
 		}
 	}
 
-	// ch2 context: 3 shared inbound + 1 ch2 outbound = 4
-	msgs2, err := env.db.ListChannelMessages(botObj.ID, ch2.ID, sender, 50)
+	// ch2: 1 inbound + 1 outbound = 2
+	msgs2, err := env.db.ListChannelMessages(ch2.ID, sender, 50)
 	if err != nil {
-		t.Fatalf("ListChannelMessages ch2: %v", err)
+		t.Fatalf("ch2: %v", err)
 	}
-	if len(msgs2) != 4 {
-		t.Errorf("ch2 context: want 4, got %d", len(msgs2))
+	if len(msgs2) != 2 {
+		t.Errorf("ch2: want 2, got %d", len(msgs2))
 	}
 	for _, m := range msgs2 {
 		var p struct{ Content string }
 		json.Unmarshal(m.Payload, &p)
-		if p.Content == "support reply" {
-			t.Error("ch2 should NOT contain support reply")
+		if p.Content == "support reply" || p.Content == "help me" {
+			t.Errorf("ch2 should NOT contain ch1 content: %q", p.Content)
 		}
 	}
 
-	// Different sender sees nothing
-	msgs3, _ := env.db.ListChannelMessages(botObj.ID, ch1.ID, "other@wechat", 50)
+	// Other sender: 0
+	msgs3, _ := env.db.ListChannelMessages(ch1.ID, "other@wechat", 50)
 	if len(msgs3) != 0 {
 		t.Errorf("other sender: want 0, got %d", len(msgs3))
 	}

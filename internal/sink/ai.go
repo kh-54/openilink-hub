@@ -52,7 +52,7 @@ func (s *AI) reply(d Delivery) {
 		}
 	}
 
-	reply, err := ai.Complete(ctx, cfg, s.DB, d.BotDBID, d.Channel.ID, sender, d.Content)
+	reply, err := ai.Complete(ctx, cfg, s.DB, d.Channel.ID, sender, d.Content)
 
 	if typingTicket != "" {
 		d.Provider.SendTyping(ctx, sender, typingTicket, false)

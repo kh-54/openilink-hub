@@ -36,7 +36,7 @@ func TestCompleteWithRealAPI(t *testing.T) {
 		MaxHistory:   5,
 	}
 
-	reply, err := Complete(context.Background(), cfg, db, "nonexistent-bot", "nonexistent-channel", "test-sender", "Hello, what is 1+1?")
+	reply, err := Complete(context.Background(), cfg, db, "nonexistent-channel", "test-sender", "Hello, what is 1+1?")
 	if err != nil {
 		t.Fatalf("Complete failed: %v", err)
 	}
