@@ -38,15 +38,17 @@ type Manager struct {
 	hub       *relay.Hub
 	sinks     []sink.Sink
 	store     *storage.Storage // optional, for media files
+	baseURL   string           // Hub origin for proxy URLs
 }
 
-func NewManager(db *database.DB, hub *relay.Hub, sinks []sink.Sink, store *storage.Storage) *Manager {
+func NewManager(db *database.DB, hub *relay.Hub, sinks []sink.Sink, store *storage.Storage, baseURL string) *Manager {
 	return &Manager{
 		instances: make(map[string]*Instance),
 		db:        db,
 		hub:       hub,
 		sinks:     sinks,
 		store:     store,
+		baseURL:   baseURL,
 	}
 }
 
@@ -164,10 +166,8 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 
 	_ = m.db.IncrBotMsgCount(inst.DBID)
 
-	// Download and store media files
-	if m.store != nil {
-		m.processMedia(inst, &msg)
-	}
+	// Process media files (store to MinIO or generate proxy URLs)
+	m.processMedia(inst, &msg)
 
 	// Build payload with media URLs
 	payloadMap := map[string]any{"content": content}
@@ -254,7 +254,9 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 }
 
 // matchFilter checks if a message passes the channel's filter rule.
-// processMedia downloads media items and stores them, replacing URLs.
+// processMedia handles media items:
+// - With MinIO: download → store → set URL to MinIO
+// - Without MinIO: set URL to Hub proxy endpoint
 func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 	ctx := context.Background()
 	for i := range msg.Items {
@@ -262,21 +264,30 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 		if item.Media == nil || item.Media.EncryptQueryParam == "" {
 			continue
 		}
-		data, err := inst.Provider.DownloadMedia(ctx, item.Media.EncryptQueryParam, item.Media.AESKey)
-		if err != nil {
-			slog.Error("media download failed", "bot", inst.DBID, "type", item.Type, "err", err)
-			continue
+
+		if m.store != nil {
+			// Download and store to MinIO
+			data, err := inst.Provider.DownloadMedia(ctx, item.Media.EncryptQueryParam, item.Media.AESKey)
+			if err != nil {
+				slog.Error("media download failed", "bot", inst.DBID, "type", item.Type, "err", err)
+				continue
+			}
+			ext := mediaExt(item.Type)
+			ct := mediaContentType(item.Type)
+			key := fmt.Sprintf("media/%s/%s/%d%s", inst.DBID, msg.ExternalID, i, ext)
+			url, err := m.store.Put(ctx, key, ct, data)
+			if err != nil {
+				slog.Error("media store failed", "bot", inst.DBID, "key", key, "err", err)
+				continue
+			}
+			item.Media.URL = url
+			item.Media.FileSize = int64(len(data))
+		} else {
+			// Fallback: proxy URL via Hub
+			item.Media.URL = fmt.Sprintf("%s/api/v1/channels/media?eqp=%s&aes=%s&ct=%s",
+				m.baseURL, item.Media.EncryptQueryParam, item.Media.AESKey,
+				mediaContentType(item.Type))
 		}
-		ext := mediaExt(item.Type)
-		contentType := mediaContentType(item.Type)
-		key := fmt.Sprintf("media/%s/%s/%d%s", inst.DBID, msg.ExternalID, i, ext)
-		url, err := m.store.Put(ctx, key, contentType, data)
-		if err != nil {
-			slog.Error("media store failed", "bot", inst.DBID, "key", key, "err", err)
-			continue
-		}
-		item.Media.URL = url
-		item.Media.FileSize = int64(len(data))
 	}
 }
 

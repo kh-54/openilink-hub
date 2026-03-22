@@ -66,6 +66,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/channels/typing", s.handleChannelTyping)
 	mux.HandleFunc("POST /api/v1/channels/config", s.handleChannelConfig)
 	mux.HandleFunc("GET /api/v1/channels/status", s.handleChannelStatus)
+	mux.HandleFunc("GET /api/v1/channels/media", s.handleChannelMedia)
 
 	// --- Protected routes ---
 	protected := http.NewServeMux()

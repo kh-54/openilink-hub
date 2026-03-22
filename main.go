@@ -80,7 +80,7 @@ func main() {
 		&sink.AI{DB: db},
 		&sink.Webhook{DB: db},
 	}
-	mgr := bot.NewManager(db, hub, sinks, store)
+	mgr := bot.NewManager(db, hub, sinks, store, cfg.RPOrigin)
 	srv.BotManager = mgr
 	srv.Hub = hub
 

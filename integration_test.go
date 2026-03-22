@@ -77,7 +77,7 @@ func setup(t *testing.T) *testEnv {
 		&sink.AI{DB: db},
 		&sink.Webhook{DB: db},
 	}
-	mgr := bot.NewManager(db, hub, sinks, nil)
+	mgr := bot.NewManager(db, hub, sinks, nil, "http://localhost")
 	server.BotManager = mgr
 	server.Hub = hub
 
