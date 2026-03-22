@@ -223,16 +223,45 @@ func isVoiceFile(filename string) bool {
 		strings.HasSuffix(lower, ".pcm")
 }
 
+// extractPCMFromWAV parses WAV and returns PCM data and sample rate.
+// Falls back to raw data with 24kHz if not a valid WAV.
+func extractPCMFromWAV(data []byte) (pcm []byte, sampleRate int) {
+	if len(data) < 44 || string(data[:4]) != "RIFF" {
+		return data, 24000
+	}
+	// Read sample rate from WAV header (bytes 24-27, little-endian)
+	sampleRate = int(data[24]) | int(data[25])<<8 | int(data[26])<<16 | int(data[27])<<24
+	if sampleRate <= 0 {
+		sampleRate = 24000
+	}
+	// Find "data" chunk — not always at offset 44
+	for i := 12; i+8 < len(data); {
+		chunkID := string(data[i : i+4])
+		chunkSize := int(data[i+4]) | int(data[i+5])<<8 | int(data[i+6])<<16 | int(data[i+7])<<24
+		if chunkID == "data" {
+			start := i + 8
+			end := start + chunkSize
+			if end > len(data) {
+				end = len(data)
+			}
+			return data[start:end], sampleRate
+		}
+		i += 8 + chunkSize
+		if chunkSize%2 != 0 {
+			i++ // padding byte
+		}
+	}
+	// Fallback: skip standard 44-byte header
+	return data[44:], sampleRate
+}
+
 // sendVoice encodes audio to SILK, uploads to CDN, and sends as voice message.
 func (p *Provider) sendVoice(ctx context.Context, recipient, contextToken string, data []byte) (string, error) {
-	// Extract PCM from WAV (skip 44-byte header if present)
-	pcm := data
-	if len(data) > 44 && string(data[:4]) == "RIFF" {
-		pcm = data[44:]
-	}
+	pcm, wavRate := extractPCMFromWAV(data)
 
-	// Encode PCM → SILK
-	silkData, err := silk.Encode(bytes.NewReader(pcm), silk.SampleRate(24000), silk.Stx(true))
+	// Encode PCM → SILK (use source sample rate)
+	slog.Info("voice encode", "pcm_bytes", len(pcm), "wav_rate", wavRate)
+	silkData, err := silk.Encode(bytes.NewReader(pcm), silk.SampleRate(wavRate), silk.Stx(true))
 	if err != nil {
 		return "", fmt.Errorf("silk encode: %w", err)
 	}
@@ -260,7 +289,7 @@ func (p *Provider) sendVoice(ctx context.Context, recipient, contextToken string
 						AESKey:            base64.StdEncoding.EncodeToString([]byte(uploaded.AESKey)),
 					},
 					EncodeType: 4, // SILK with STX
-					SampleRate: 24000,
+					SampleRate: wavRate,
 				},
 			}},
 		},
