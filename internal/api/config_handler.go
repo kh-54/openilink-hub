@@ -118,11 +118,12 @@ func (s *Server) handleGetAIConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := map[string]string{
-		"base_url": dbConf["ai.base_url"],
-		"api_key":  maskSecret(dbConf["ai.api_key"]),
-		"model":    dbConf["ai.model"],
+		"base_url":      dbConf["ai.base_url"],
+		"api_key":       maskSecret(dbConf["ai.api_key"]),
+		"model":         dbConf["ai.model"],
+		"system_prompt": dbConf["ai.system_prompt"],
+		"max_history":   dbConf["ai.max_history"],
 	}
-	// Show if configured
 	if dbConf["ai.api_key"] != "" {
 		result["enabled"] = "true"
 	}
@@ -133,9 +134,11 @@ func (s *Server) handleGetAIConfig(w http.ResponseWriter, r *http.Request) {
 // PUT /api/admin/config/ai — set global AI config
 func (s *Server) handleSetAIConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		BaseURL string `json:"base_url"`
-		APIKey  string `json:"api_key"`
-		Model   string `json:"model"`
+		BaseURL      string `json:"base_url"`
+		APIKey       string `json:"api_key"`
+		Model        string `json:"model"`
+		SystemPrompt string `json:"system_prompt"`
+		MaxHistory   string `json:"max_history"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -150,6 +153,11 @@ func (s *Server) handleSetAIConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Model != "" {
 		s.DB.SetConfig("ai.model", req.Model)
+	}
+	// These can be set to empty to clear
+	s.DB.SetConfig("ai.system_prompt", req.SystemPrompt)
+	if req.MaxHistory != "" {
+		s.DB.SetConfig("ai.max_history", req.MaxHistory)
 	}
 	jsonOK(w)
 }

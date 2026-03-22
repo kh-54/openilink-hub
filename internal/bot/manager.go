@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -250,6 +251,15 @@ func (m *Manager) resolveAIConfig(cfg database.AIConfig) database.AIConfig {
 	cfg.BaseURL = global["ai.base_url"]
 	cfg.APIKey = global["ai.api_key"]
 	cfg.Model = global["ai.model"]
+	// Use global system_prompt/max_history as defaults if channel doesn't set them
+	if cfg.SystemPrompt == "" {
+		cfg.SystemPrompt = global["ai.system_prompt"]
+	}
+	if cfg.MaxHistory <= 0 {
+		if v := global["ai.max_history"]; v != "" {
+			fmt.Sscanf(v, "%d", &cfg.MaxHistory)
+		}
+	}
 	return cfg
 }
 

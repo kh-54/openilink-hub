@@ -62,7 +62,7 @@ export const api = {
 
   // Admin: AI config
   getAIConfig: () => request<any>("/api/admin/config/ai"),
-  setAIConfig: (data: { base_url?: string; api_key?: string; model?: string }) =>
+  setAIConfig: (data: { base_url?: string; api_key?: string; model?: string; system_prompt?: string; max_history?: string }) =>
     request("/api/admin/config/ai", { method: "PUT", body: JSON.stringify(data) }),
   deleteAIConfig: () => request("/api/admin/config/ai", { method: "DELETE" }),
 

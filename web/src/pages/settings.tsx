@@ -119,6 +119,8 @@ function AIConfigSection() {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [maxHistory, setMaxHistory] = useState(20);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -128,6 +130,8 @@ function AIConfigSection() {
       setConfig(data);
       setBaseUrl(data.base_url || "");
       setModel(data.model || "");
+      setSystemPrompt(data.system_prompt || "");
+      setMaxHistory(parseInt(data.max_history) || 20);
       setApiKey("");
     } catch { /* not admin */ }
   }
@@ -144,7 +148,13 @@ function AIConfigSection() {
       let url = baseUrl.replace(/\/+$/, "");
       if (url && !url.endsWith("/v1")) url += "/v1";
       setBaseUrl(url);
-      await api.setAIConfig({ base_url: url, api_key: apiKey || undefined, model: model || undefined });
+      await api.setAIConfig({
+        base_url: url,
+        api_key: apiKey || undefined,
+        model: model || undefined,
+        system_prompt: systemPrompt,
+        max_history: String(maxHistory || 20),
+      });
       load();
     } catch (err: any) { setError(err.message); }
     setSaving(false);
@@ -182,6 +192,17 @@ function AIConfigSection() {
             className="h-8 text-xs font-mono"
           />
           <Input placeholder="模型名称" value={model} onChange={(e) => setModel(e.target.value)} className="h-8 text-xs font-mono w-40" />
+        </div>
+        <textarea
+          placeholder="默认系统提示词（System Prompt），渠道未设置时使用"
+          value={systemPrompt}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          rows={3}
+          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring resize-none"
+        />
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-muted-foreground shrink-0">默认上下文消息数</label>
+          <Input type="number" value={maxHistory} onChange={(e) => setMaxHistory(parseInt(e.target.value) || 20)} className="h-8 text-xs w-20" min={1} max={100} />
         </div>
       </div>
       {error && <p className="text-[10px] text-destructive">{error}</p>}
