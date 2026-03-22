@@ -39,7 +39,7 @@ type chatResponse struct {
 
 // Complete calls the OpenAI-compatible chat completion API.
 // It builds context from recent message history for the given sender.
-func Complete(ctx context.Context, cfg database.AIConfig, db *database.DB, botID, sender, text string) (string, error) {
+func Complete(ctx context.Context, cfg database.AIConfig, db *database.DB, botID, channelID, sender, text string) (string, error) {
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
 		baseURL = defaultBaseURL
@@ -60,8 +60,8 @@ func Complete(ctx context.Context, cfg database.AIConfig, db *database.DB, botID
 		messages = append(messages, chatMessage{Role: "system", Content: cfg.SystemPrompt})
 	}
 
-	// Load recent history for this sender
-	history, _ := db.ListMessagesBySender(botID, sender, maxHistory)
+	// Load recent history scoped to this channel
+	history, _ := db.ListChannelMessages(botID, channelID, sender, maxHistory)
 	// history is DESC order, reverse it
 	for i := len(history) - 1; i >= 0; i-- {
 		m := history[i]

@@ -96,6 +96,40 @@ func (db *DB) ListMessagesBySender(botID, sender string, limit int) ([]Message, 
 	return msgs, rows.Err()
 }
 
+// ListChannelMessages returns conversation history scoped to a channel.
+// Includes inbound messages from the sender (shared across channels) and
+// outbound messages specifically from this channel (channel-specific AI replies).
+func (db *DB) ListChannelMessages(botID, channelID, sender string, limit int) ([]Message, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := db.Query(`
+		SELECT id, bot_id, channel_id, direction, sender, recipient, msg_type, payload,
+		       EXTRACT(EPOCH FROM created_at)::BIGINT
+		FROM messages
+		WHERE bot_id = $1 AND (
+			(direction = 'inbound' AND sender = $3)
+			OR (direction = 'outbound' AND channel_id = $2 AND recipient = $3)
+		)
+		ORDER BY id DESC LIMIT $4`,
+		botID, channelID, sender, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var msgs []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.BotID, &m.ChannelID, &m.Direction,
+			&m.Sender, &m.Recipient, &m.MsgType, &m.Payload, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, rows.Err()
+}
+
 func (db *DB) GetMessagesSince(botID string, afterSeq int64, limit int) ([]Message, error) {
 	if limit <= 0 {
 		limit = 100
