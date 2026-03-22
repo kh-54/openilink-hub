@@ -13,6 +13,14 @@ type Config struct {
 	RPName     string
 	Secret     string // server secret for token encryption
 
+	// Storage (MinIO / S3)
+	StorageEndpoint  string
+	StorageAccessKey string
+	StorageSecretKey string
+	StorageBucket    string
+	StorageSSL       bool
+	StoragePublicURL string
+
 	// OAuth providers
 	GitHubClientID     string
 	GitHubClientSecret string
@@ -28,6 +36,13 @@ func Parse() *Config {
 	flag.StringVar(&cfg.RPID, "rpid", envOr("RP_ID", "localhost"), "WebAuthn RP ID")
 	flag.StringVar(&cfg.RPName, "rpname", envOr("RP_NAME", "OpenILink Hub"), "WebAuthn RP display name")
 	flag.StringVar(&cfg.Secret, "secret", envOr("SECRET", "change-me-in-production"), "server secret")
+	// Storage
+	cfg.StorageEndpoint = envOr("STORAGE_ENDPOINT", "")
+	cfg.StorageAccessKey = envOr("STORAGE_ACCESS_KEY", "")
+	cfg.StorageSecretKey = envOr("STORAGE_SECRET_KEY", "")
+	cfg.StorageBucket = envOr("STORAGE_BUCKET", "openilink")
+	cfg.StorageSSL = envOr("STORAGE_SSL", "") == "true"
+	cfg.StoragePublicURL = envOr("STORAGE_PUBLIC_URL", "")
 	// OAuth
 	cfg.GitHubClientID = envOr("GITHUB_CLIENT_ID", "")
 	cfg.GitHubClientSecret = envOr("GITHUB_CLIENT_SECRET", "")

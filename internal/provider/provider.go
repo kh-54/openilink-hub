@@ -14,6 +14,7 @@ type Provider interface {
 	Send(ctx context.Context, msg OutboundMessage) (string, error)
 	SendTyping(ctx context.Context, recipient, ticket string, typing bool) error
 	GetConfig(ctx context.Context, recipient, contextToken string) (*BotConfig, error)
+	DownloadMedia(ctx context.Context, encryptQueryParam, aesKey string) ([]byte, error)
 	Status() string
 }
 
@@ -75,10 +76,11 @@ type MessageItem struct {
 
 // Media holds CDN media info for image/voice/file/video items.
 type Media struct {
-	URL       string `json:"url,omitempty"`
-	AESKey    string `json:"aes_key,omitempty"`
-	FileSize  int64  `json:"file_size,omitempty"`
-	MediaType string `json:"media_type,omitempty"` // "image", "voice", "file", "video"
+	URL               string `json:"url,omitempty"`
+	EncryptQueryParam string `json:"encrypt_query_param,omitempty"`
+	AESKey            string `json:"aes_key,omitempty"`
+	FileSize          int64  `json:"file_size,omitempty"`
+	MediaType         string `json:"media_type,omitempty"` // "image", "voice", "file", "video"
 	// Voice-specific
 	PlayTime int `json:"play_time,omitempty"` // seconds
 	// Video-specific

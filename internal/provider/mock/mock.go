@@ -58,6 +58,10 @@ func (p *Provider) Send(_ context.Context, msg provider.OutboundMessage) (string
 
 func (p *Provider) SendTyping(_ context.Context, _, _ string, _ bool) error { return nil }
 
+func (p *Provider) DownloadMedia(_ context.Context, _, _ string) ([]byte, error) {
+	return []byte("mock-media-data"), nil
+}
+
 func (p *Provider) GetConfig(_ context.Context, _, _ string) (*provider.BotConfig, error) {
 	return &provider.BotConfig{TypingTicket: "mock-ticket"}, nil
 }

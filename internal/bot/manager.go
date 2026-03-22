@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/openilink/openilink-hub/internal/provider"
 	"github.com/openilink/openilink-hub/internal/relay"
 	"github.com/openilink/openilink-hub/internal/sink"
+	"github.com/openilink/openilink-hub/internal/storage"
 )
 
 var mentionRe = regexp.MustCompile(`@(\S+)`)
@@ -35,14 +37,16 @@ type Manager struct {
 	db        *database.DB
 	hub       *relay.Hub
 	sinks     []sink.Sink
+	store     *storage.Storage // optional, for media files
 }
 
-func NewManager(db *database.DB, hub *relay.Hub, sinks []sink.Sink) *Manager {
+func NewManager(db *database.DB, hub *relay.Hub, sinks []sink.Sink, store *storage.Storage) *Manager {
 	return &Manager{
 		instances: make(map[string]*Instance),
 		db:        db,
 		hub:       hub,
 		sinks:     sinks,
+		store:     store,
 	}
 }
 
@@ -158,6 +162,14 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		}
 	}
 
+	_ = m.db.IncrBotMsgCount(inst.DBID)
+
+	// Download and store media files
+	if m.store != nil {
+		m.processMedia(inst, &msg)
+	}
+
+	// Build payload with media URLs
 	payloadMap := map[string]any{"content": content}
 	if msg.GroupID != "" {
 		payloadMap["group_id"] = msg.GroupID
@@ -165,9 +177,15 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 	if msg.ContextToken != "" {
 		payloadMap["context_token"] = msg.ContextToken
 	}
+	// Include media URLs in payload
+	for _, item := range msg.Items {
+		if item.Media != nil && item.Media.URL != "" {
+			payloadMap["media_url"] = item.Media.URL
+			payloadMap["media_type"] = item.Media.MediaType
+			break
+		}
+	}
 	payload, _ := json.Marshal(payloadMap)
-
-	_ = m.db.IncrBotMsgCount(inst.DBID)
 
 	items := make([]relay.MessageItem, len(msg.Items))
 	for i, item := range msg.Items {
@@ -236,6 +254,60 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 }
 
 // matchFilter checks if a message passes the channel's filter rule.
+// processMedia downloads media items and stores them, replacing URLs.
+func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
+	ctx := context.Background()
+	for i := range msg.Items {
+		item := &msg.Items[i]
+		if item.Media == nil || item.Media.EncryptQueryParam == "" {
+			continue
+		}
+		data, err := inst.Provider.DownloadMedia(ctx, item.Media.EncryptQueryParam, item.Media.AESKey)
+		if err != nil {
+			slog.Error("media download failed", "bot", inst.DBID, "type", item.Type, "err", err)
+			continue
+		}
+		ext := mediaExt(item.Type)
+		contentType := mediaContentType(item.Type)
+		key := fmt.Sprintf("media/%s/%s/%d%s", inst.DBID, msg.ExternalID, i, ext)
+		url, err := m.store.Put(ctx, key, contentType, data)
+		if err != nil {
+			slog.Error("media store failed", "bot", inst.DBID, "key", key, "err", err)
+			continue
+		}
+		item.Media.URL = url
+		item.Media.FileSize = int64(len(data))
+	}
+}
+
+func mediaExt(itemType string) string {
+	switch itemType {
+	case "image":
+		return ".jpg"
+	case "voice":
+		return ".silk"
+	case "video":
+		return ".mp4"
+	default:
+		return ""
+	}
+}
+
+func mediaContentType(itemType string) string {
+	switch itemType {
+	case "image":
+		return "image/jpeg"
+	case "voice":
+		return "audio/silk"
+	case "video":
+		return "video/mp4"
+	case "file":
+		return "application/octet-stream"
+	default:
+		return "application/octet-stream"
+	}
+}
+
 func matchFilter(rule database.FilterRule, sender, text, msgType string) bool {
 	if len(rule.UserIDs) > 0 {
 		found := false

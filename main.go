@@ -18,6 +18,7 @@ import (
 	"github.com/openilink/openilink-hub/internal/database"
 	"github.com/openilink/openilink-hub/internal/relay"
 	"github.com/openilink/openilink-hub/internal/sink"
+	"github.com/openilink/openilink-hub/internal/storage"
 
 	// Register providers
 	_ "github.com/openilink/openilink-hub/internal/provider/ilink"
@@ -54,13 +55,32 @@ func main() {
 		OAuthStates:  api.SetupOAuth(cfg),
 	}
 
+	// Storage (optional)
+	var store *storage.Storage
+	if cfg.StorageEndpoint != "" {
+		var err error
+		store, err = storage.New(storage.Config{
+			Endpoint:  cfg.StorageEndpoint,
+			AccessKey: cfg.StorageAccessKey,
+			SecretKey: cfg.StorageSecretKey,
+			Bucket:    cfg.StorageBucket,
+			UseSSL:    cfg.StorageSSL,
+			PublicURL: cfg.StoragePublicURL,
+		})
+		if err != nil {
+			slog.Error("storage init failed", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("storage connected", "endpoint", cfg.StorageEndpoint, "bucket", cfg.StorageBucket)
+	}
+
 	hub := relay.NewHub(srv.SetupUpstreamHandler())
 	sinks := []sink.Sink{
 		&sink.WS{Hub: hub},
 		&sink.AI{DB: db},
 		&sink.Webhook{DB: db},
 	}
-	mgr := bot.NewManager(db, hub, sinks)
+	mgr := bot.NewManager(db, hub, sinks, store)
 	srv.BotManager = mgr
 	srv.Hub = hub
 

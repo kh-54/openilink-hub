@@ -10,6 +10,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: openilink
+      MINIO_ROOT_PASSWORD: openilink
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+    volumes:
+      - miniodata:/data
+
   hub:
     build: .
     ports:
@@ -18,12 +30,19 @@ services:
       DATABASE_URL: postgres://openilink:openilink@postgres:5432/openilink?sslmode=disable
       RP_ORIGIN: http://localhost:9800
       RP_ID: localhost
+      STORAGE_ENDPOINT: minio:9000
+      STORAGE_ACCESS_KEY: openilink
+      STORAGE_SECRET_KEY: openilink
+      STORAGE_BUCKET: openilink
+      # STORAGE_PUBLIC_URL: https://s3.example.com/openilink
       # GITHUB_CLIENT_ID:
       # GITHUB_CLIENT_SECRET:
       # LINUXDO_CLIENT_ID:
       # LINUXDO_CLIENT_SECRET:
     depends_on:
       - postgres
+      - minio
 
 volumes:
   pgdata:
+  miniodata:

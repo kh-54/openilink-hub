@@ -154,6 +154,10 @@ func (p *Provider) GetConfig(ctx context.Context, recipient, contextToken string
 	}, nil
 }
 
+func (p *Provider) DownloadMedia(ctx context.Context, encryptQueryParam, aesKey string) ([]byte, error) {
+	return p.client.DownloadFile(ctx, encryptQueryParam, aesKey)
+}
+
 func convertInbound(msg ilink.WeixinMessage) provider.InboundMessage {
 	var items []provider.MessageItem
 	for _, item := range msg.ItemList {
@@ -252,7 +256,8 @@ func convertCDNMedia(m *ilink.CDNMedia, mediaType string) *provider.Media {
 		return nil
 	}
 	return &provider.Media{
-		AESKey:    m.AESKey,
-		MediaType: mediaType,
+		EncryptQueryParam: m.EncryptQueryParam,
+		AESKey:            m.AESKey,
+		MediaType:         mediaType,
 	}
 }
