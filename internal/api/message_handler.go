@@ -8,6 +8,36 @@ import (
 	"github.com/openilink/openilink-hub/internal/auth"
 )
 
+func (s *Server) handleRetryMedia(w http.ResponseWriter, r *http.Request) {
+	botID := r.PathValue("id")
+	userID := auth.UserIDFromContext(r.Context())
+
+	bot, err := s.DB.GetBot(botID)
+	if err != nil || bot.UserID != userID {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	msgIDStr := r.PathValue("msgId")
+	msgID, err := strconv.ParseInt(msgIDStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid message id", http.StatusBadRequest)
+		return
+	}
+
+	msg, err := s.DB.GetMessage(msgID)
+	if err != nil || msg.BotID != botID {
+		jsonError(w, "message not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.BotManager.RetryMediaDownload(msgID); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonOK(w)
+}
+
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	botID := r.PathValue("id")

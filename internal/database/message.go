@@ -125,6 +125,20 @@ func (db *DB) ListChannelMessages(channelID, sender string, limit int) ([]Messag
 	return msgs, rows.Err()
 }
 
+func (db *DB) GetMessage(id int64) (*Message, error) {
+	var m Message
+	err := db.QueryRow(`
+		SELECT id, bot_id, channel_id, direction, sender, recipient, msg_type, payload,
+		       EXTRACT(EPOCH FROM created_at)::BIGINT
+		FROM messages WHERE id = $1`, id,
+	).Scan(&m.ID, &m.BotID, &m.ChannelID, &m.Direction,
+		&m.Sender, &m.Recipient, &m.MsgType, &m.Payload, &m.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 func (db *DB) UpdateMessagePayload(id int64, payload json.RawMessage) error {
 	_, err := db.Exec("UPDATE messages SET payload = $1 WHERE id = $2", payload, id)
 	return err

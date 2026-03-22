@@ -6,7 +6,7 @@ import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import { api } from "../lib/api";
 
-type Message = { id: number; direction: string; sender: string; recipient: string; msg_type: string; payload: any; created_at: number };
+type Message = { id: number; bot_id?: string; direction: string; sender: string; recipient: string; msg_type: string; payload: any; created_at: number };
 
 function getMediaUrl(m: Message): string | null {
   // Prefer storage key (MinIO via proxy)
@@ -23,12 +23,29 @@ function MessageContent({ m }: { m: Message }) {
   const mediaType = m.payload?.media_type || m.msg_type;
   const mediaStatus = m.payload?.media_status;
 
-  // Media is downloading
   if (mediaStatus === "downloading") {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="animate-pulse">⏳</span>
         {mediaType === "image" ? "图片下载中..." : mediaType === "video" ? "视频下载中..." : mediaType === "voice" ? "语音下载中..." : "文件下载中..."}
+      </div>
+    );
+  }
+  if (mediaStatus === "failed") {
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-destructive">下载失败</span>
+        <button
+          className="text-primary hover:underline cursor-pointer"
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              await fetch(`/api/bots/${m.bot_id}/messages/${m.id}/retry_media`, {
+                method: "POST", credentials: "same-origin",
+              });
+            } catch {}
+          }}
+        >重试</button>
       </div>
     );
   }

@@ -139,6 +139,65 @@ func (m *Manager) StopAll() {
 	m.instances = make(map[string]*Instance)
 }
 
+// RetryMediaDownload retries downloading media for a failed message.
+func (m *Manager) RetryMediaDownload(msgID int64) error {
+	msg, err := m.db.GetMessage(msgID)
+	if err != nil {
+		return err
+	}
+	var payload map[string]any
+	json.Unmarshal(msg.Payload, &payload)
+
+	cdn, ok := payload["media_cdn"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("no media_cdn in message")
+	}
+	eqp, _ := cdn["eqp"].(string)
+	aes, _ := cdn["aes"].(string)
+	mediaType, _ := payload["media_type"].(string)
+	if eqp == "" || aes == "" {
+		return fmt.Errorf("missing cdn params")
+	}
+
+	inst, ok2 := m.GetInstance(msg.BotID)
+	if !ok2 {
+		return fmt.Errorf("bot not connected")
+	}
+
+	// Mark as downloading
+	payload["media_status"] = "downloading"
+	p, _ := json.Marshal(payload)
+	m.db.UpdateMessagePayload(msgID, p)
+
+	go func() {
+		item := provider.MessageItem{
+			Type: mediaType,
+			Media: &provider.Media{
+				EncryptQueryParam: eqp,
+				AESKey:            aes,
+				MediaType:         mediaType,
+			},
+		}
+		fakeMsg := provider.InboundMessage{
+			ExternalID: fmt.Sprintf("retry-%d", msgID),
+			Items:      []provider.MessageItem{item},
+		}
+		m.processMedia(inst, &fakeMsg)
+
+		if fakeMsg.Items[0].Media.StorageKey != "" {
+			payload["media_key"] = fakeMsg.Items[0].Media.StorageKey
+			payload["media_status"] = "ready"
+		} else if fakeMsg.Items[0].Media.URL != "" {
+			payload["media_status"] = "ready"
+		} else {
+			payload["media_status"] = "failed"
+		}
+		updated, _ := json.Marshal(payload)
+		m.db.UpdateMessagePayload(msgID, updated)
+	}()
+	return nil
+}
+
 func (m *Manager) onStatusChange(inst *Instance, status string) {
 	env := relay.NewEnvelope("bot_status", relay.BotStatusData{
 		BotID:  inst.DBID,
@@ -278,22 +337,23 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 func (m *Manager) downloadAndUpdateMedia(inst *Instance, msg provider.InboundMessage, payloadMap map[string]any, msgIDs []int64) {
 	m.processMedia(inst, &msg)
 
-	// Update payload with storage key
+	// Check if any media failed
+	allOk := true
 	for _, item := range msg.Items {
-		if item.Media != nil && item.Media.StorageKey != "" {
-			payloadMap["media_key"] = item.Media.StorageKey
-			payloadMap["media_status"] = "ready"
-			break
-		}
-	}
-	// If no storage key (no MinIO), still mark as ready with CDN proxy
-	if _, ok := payloadMap["media_key"]; !ok {
-		for _, item := range msg.Items {
-			if item.Media != nil && item.Media.URL != "" {
-				payloadMap["media_status"] = "ready"
-				break
+		if item.Media != nil && item.Media.EncryptQueryParam != "" {
+			if item.Media.StorageKey != "" {
+				payloadMap["media_key"] = item.Media.StorageKey
+			} else if item.Media.URL != "" {
+				// CDN proxy fallback
+			} else {
+				allOk = false
 			}
 		}
+	}
+	if allOk {
+		payloadMap["media_status"] = "ready"
+	} else {
+		payloadMap["media_status"] = "failed"
 	}
 
 	updated, _ := json.Marshal(payloadMap)
