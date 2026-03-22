@@ -8,12 +8,12 @@ import (
 )
 
 // fakeConn simulates a Conn with a readable send channel for testing.
-func fakeConn(sublevelID, botDBID string, hub *Hub) *Conn {
+func fakeConn(channelID, botID string, hub *Hub) *Conn {
 	return &Conn{
-		SublevelID: sublevelID,
-		BotDBID:    botDBID,
-		hub:        hub,
-		send:       make(chan []byte, 64),
+		ChannelID: channelID,
+		BotID:     botID,
+		hub:       hub,
+		send:      make(chan []byte, 64),
 	}
 }
 
@@ -31,7 +31,7 @@ func readEnvelope(c *Conn, timeout time.Duration) (*Envelope, bool) {
 func TestHubRegisterUnregister(t *testing.T) {
 	hub := NewHub(nil)
 
-	c := fakeConn("sub-1", "bot-1", hub)
+	c := fakeConn("ch-1", "bot-1", hub)
 	hub.Register(c)
 
 	if hub.ConnectedCount() != 1 {
@@ -47,10 +47,10 @@ func TestHubRegisterUnregister(t *testing.T) {
 func TestHubRegisterReplacesExisting(t *testing.T) {
 	hub := NewHub(nil)
 
-	c1 := fakeConn("sub-1", "bot-1", hub)
+	c1 := fakeConn("ch-1", "bot-1", hub)
 	hub.Register(c1)
 
-	c2 := fakeConn("sub-1", "bot-1", hub)
+	c2 := fakeConn("ch-1", "bot-1", hub)
 	hub.Register(c2)
 
 	if hub.ConnectedCount() != 1 {
@@ -67,11 +67,11 @@ func TestHubRegisterReplacesExisting(t *testing.T) {
 func TestHubSendTo(t *testing.T) {
 	hub := NewHub(nil)
 
-	c := fakeConn("sub-1", "bot-1", hub)
+	c := fakeConn("ch-1", "bot-1", hub)
 	hub.Register(c)
 
 	env := NewEnvelope("test", map[string]string{"key": "value"})
-	hub.SendTo("sub-1", env)
+	hub.SendTo("ch-1", env)
 
 	received, ok := readEnvelope(c, 100*time.Millisecond)
 	if !ok {
@@ -81,24 +81,23 @@ func TestHubSendTo(t *testing.T) {
 		t.Errorf("type = %q, want test", received.Type)
 	}
 
-	// SendTo non-existent sublevel should not panic
-	hub.SendTo("sub-999", env)
+	// SendTo non-existent channel should not panic
+	hub.SendTo("ch-999", env)
 }
 
 func TestHubBroadcast(t *testing.T) {
 	hub := NewHub(nil)
 
-	c1 := fakeConn("sub-1", "bot-A", hub)
-	c2 := fakeConn("sub-2", "bot-A", hub)
-	c3 := fakeConn("sub-3", "bot-B", hub)
+	c1 := fakeConn("ch-1", "bot-A", hub)
+	c2 := fakeConn("ch-2", "bot-A", hub)
+	c3 := fakeConn("ch-3", "bot-B", hub)
 	hub.Register(c1)
 	hub.Register(c2)
 	hub.Register(c3)
 
-	env := NewEnvelope("message", MessageData{FromUserID: "user1"})
+	env := NewEnvelope("message", MessageData{Sender: "user1"})
 	hub.Broadcast("bot-A", env)
 
-	// c1 and c2 should receive, c3 should not
 	if _, ok := readEnvelope(c1, 100*time.Millisecond); !ok {
 		t.Error("c1 should receive broadcast")
 	}
@@ -120,7 +119,7 @@ func TestHubUpstreamHandler(t *testing.T) {
 		mu.Unlock()
 	})
 
-	c := fakeConn("sub-1", "bot-1", hub)
+	c := fakeConn("ch-1", "bot-1", hub)
 	hub.Register(c)
 
 	env := Envelope{Type: "send_text", ReqID: "req-1"}
@@ -140,12 +139,11 @@ func TestHubConcurrentAccess(t *testing.T) {
 	hub := NewHub(nil)
 	var wg sync.WaitGroup
 
-	// Concurrent register/unregister/broadcast
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			c := fakeConn("sub-concurrent", "bot-1", hub)
+			c := fakeConn("ch-concurrent", "bot-1", hub)
 			hub.Register(c)
 			hub.Broadcast("bot-1", Envelope{Type: "ping"})
 			hub.Unregister(c)

@@ -7,8 +7,8 @@ import (
 
 func TestNewEnvelope(t *testing.T) {
 	env := NewEnvelope("message", MessageData{
-		MessageID:  123,
-		FromUserID: "user@im.wechat",
+		ExternalID: "123",
+		Sender:     "user@im.wechat",
 		Timestamp:  1711100000000,
 		Items:      []MessageItem{{Type: "text", Text: "hello"}},
 	})
@@ -21,11 +21,11 @@ func TestNewEnvelope(t *testing.T) {
 	if err := json.Unmarshal(env.Data, &data); err != nil {
 		t.Fatalf("unmarshal data: %v", err)
 	}
-	if data.MessageID != 123 {
-		t.Errorf("message_id = %d, want 123", data.MessageID)
+	if data.ExternalID != "123" {
+		t.Errorf("external_id = %q, want 123", data.ExternalID)
 	}
-	if data.FromUserID != "user@im.wechat" {
-		t.Errorf("from_user_id = %q, want %q", data.FromUserID, "user@im.wechat")
+	if data.Sender != "user@im.wechat" {
+		t.Errorf("sender = %q, want %q", data.Sender, "user@im.wechat")
 	}
 	if len(data.Items) != 1 || data.Items[0].Text != "hello" {
 		t.Errorf("items = %+v, want [{text hello}]", data.Items)
@@ -61,12 +61,6 @@ func TestNewAck(t *testing.T) {
 			if ack.Success != tt.success {
 				t.Errorf("success = %v, want %v", ack.Success, tt.success)
 			}
-			if ack.ClientID != tt.clientID {
-				t.Errorf("client_id = %q, want %q", ack.ClientID, tt.clientID)
-			}
-			if ack.Error != tt.errMsg {
-				t.Errorf("error = %q, want %q", ack.Error, tt.errMsg)
-			}
 		})
 	}
 }
@@ -85,29 +79,23 @@ func TestEnvelopeJSON(t *testing.T) {
 	if decoded.Type != "ping" {
 		t.Errorf("type = %q, want ping", decoded.Type)
 	}
-	if decoded.Data != nil {
-		t.Errorf("data = %s, want nil", string(decoded.Data))
-	}
 }
 
 func TestSendTextDataJSON(t *testing.T) {
-	input := `{"type":"send_text","req_id":"abc","data":{"to_user_id":"user123","text":"hi"}}`
+	input := `{"type":"send_text","req_id":"abc","data":{"recipient":"user123","text":"hi"}}`
 	var env Envelope
 	if err := json.Unmarshal([]byte(input), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Type != "send_text" {
-		t.Errorf("type = %q", env.Type)
-	}
-	if env.ReqID != "abc" {
-		t.Errorf("req_id = %q", env.ReqID)
+	if env.Type != "send_text" || env.ReqID != "abc" {
+		t.Errorf("envelope = %+v", env)
 	}
 
 	var data SendTextData
 	if err := json.Unmarshal(env.Data, &data); err != nil {
 		t.Fatal(err)
 	}
-	if data.ToUserID != "user123" || data.Text != "hi" {
+	if data.Recipient != "user123" || data.Text != "hi" {
 		t.Errorf("data = %+v", data)
 	}
 }

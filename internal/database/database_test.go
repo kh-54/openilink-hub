@@ -1,15 +1,16 @@
 package database
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 )
 
 func testDB(t *testing.T) *DB {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		t.Skip("DATABASE_URL not set, skipping integration test")
+		t.Skip("TEST_DATABASE_URL not set, skipping integration test")
 	}
 	db, err := Open(dsn)
 	if err != nil {
@@ -33,10 +34,6 @@ func TestUserCRUD(t *testing.T) {
 	}
 	cleanupUser(t, db, user.ID)
 
-	if user.Role != RoleAdmin { // first user = admin
-		// might already have users from previous test runs
-	}
-
 	got, err := db.GetUserByID(user.ID)
 	if err != nil {
 		t.Fatalf("get by id: %v", err)
@@ -50,7 +47,6 @@ func TestUserCRUD(t *testing.T) {
 		t.Fatalf("get by username failed")
 	}
 
-	// Update profile
 	if err := db.UpdateUserProfile(user.ID, "New Name", "test@example.com"); err != nil {
 		t.Fatalf("update profile: %v", err)
 	}
@@ -59,7 +55,6 @@ func TestUserCRUD(t *testing.T) {
 		t.Errorf("profile = %q / %q", got.DisplayName, got.Email)
 	}
 
-	// List
 	users, err := db.ListUsers()
 	if err != nil || len(users) == 0 {
 		t.Fatalf("list users failed")
@@ -72,7 +67,8 @@ func TestBotCRUD(t *testing.T) {
 	user, _ := db.CreateUser("test_bot_user2", "Bot User")
 	cleanupUser(t, db, user.ID)
 
-	bot, err := db.CreateBot(user.ID, "MyBot", "ilink-bot-123", "token-abc", "https://example.com", "user@im.wechat")
+	creds, _ := json.Marshal(map[string]string{"bot_id": "ilink-bot-123", "bot_token": "token-abc"})
+	bot, err := db.CreateBot(user.ID, "MyBot", "ilink", creds)
 	if err != nil {
 		t.Fatalf("create bot: %v", err)
 	}
@@ -85,14 +81,12 @@ func TestBotCRUD(t *testing.T) {
 		t.Fatalf("list bots: got %d", len(bots))
 	}
 
-	// Rename
 	db.UpdateBotName(bot.ID, "Renamed")
 	got, _ := db.GetBot(bot.ID)
 	if got.Name != "Renamed" {
 		t.Errorf("name after rename = %q", got.Name)
 	}
 
-	// Increment message count
 	db.IncrBotMsgCount(bot.ID)
 	db.IncrBotMsgCount(bot.ID)
 	got, _ = db.GetBot(bot.ID)
@@ -100,7 +94,6 @@ func TestBotCRUD(t *testing.T) {
 		t.Errorf("msg_count = %d, want 2", got.MsgCount)
 	}
 
-	// Stats
 	stats, err := db.GetBotStats(user.ID)
 	if err != nil {
 		t.Fatalf("stats: %v", err)
@@ -112,27 +105,31 @@ func TestBotCRUD(t *testing.T) {
 	db.DeleteBot(bot.ID)
 }
 
-func TestSublevelWithFilter(t *testing.T) {
+func TestChannelWithFilter(t *testing.T) {
 	db := testDB(t)
 
-	user, _ := db.CreateUser("test_sub_filter", "Sub Filter")
+	user, _ := db.CreateUser("test_ch_filter", "Ch Filter")
 	cleanupUser(t, db, user.ID)
-	bot, _ := db.CreateBot(user.ID, "", "bot-sf", "tok", "", "")
+
+	creds, _ := json.Marshal(map[string]string{"mock": "true"})
+	bot, _ := db.CreateBot(user.ID, "", "mock", creds)
 
 	filter := &FilterRule{
 		UserIDs:  []string{"user-a", "user-b"},
 		Keywords: []string{"help"},
 	}
-	sub, err := db.CreateSublevel(user.ID, bot.ID, "Filtered", filter)
+	ch, err := db.CreateChannel(bot.ID, "Filtered", "filtered", filter)
 	if err != nil {
-		t.Fatalf("create sublevel: %v", err)
+		t.Fatalf("create channel: %v", err)
 	}
-	if len(sub.FilterRule.UserIDs) != 2 {
-		t.Errorf("filter user_ids = %v", sub.FilterRule.UserIDs)
+	if len(ch.FilterRule.UserIDs) != 2 {
+		t.Errorf("filter user_ids = %v", ch.FilterRule.UserIDs)
+	}
+	if ch.Handle != "filtered" {
+		t.Errorf("handle = %q, want filtered", ch.Handle)
 	}
 
-	// Reload from DB
-	got, err := db.GetSublevelByAPIKey(sub.APIKey)
+	got, err := db.GetChannelByAPIKey(ch.APIKey)
 	if err != nil {
 		t.Fatalf("get by key: %v", err)
 	}
@@ -140,15 +137,14 @@ func TestSublevelWithFilter(t *testing.T) {
 		t.Errorf("filter after reload = %+v", got.FilterRule)
 	}
 
-	// Update
-	newFilter := &FilterRule{MessageTypes: []int{1, 2}}
-	db.UpdateSublevel(sub.ID, "Updated", newFilter, true)
-	got, _ = db.GetSublevel(sub.ID)
-	if got.Name != "Updated" || len(got.FilterRule.MessageTypes) != 2 {
+	newFilter := &FilterRule{MessageTypes: []string{"text", "image"}}
+	db.UpdateChannel(ch.ID, "Updated", "newhandle", newFilter, true)
+	got, _ = db.GetChannel(ch.ID)
+	if got.Name != "Updated" || got.Handle != "newhandle" || len(got.FilterRule.MessageTypes) != 2 {
 		t.Errorf("after update = %+v", got)
 	}
 
-	db.DeleteSublevel(sub.ID)
+	db.DeleteChannel(ch.ID)
 	db.DeleteBot(bot.ID)
 }
 
@@ -157,19 +153,22 @@ func TestMessageCRUD(t *testing.T) {
 
 	user, _ := db.CreateUser("test_msg_user2", "Msg User")
 	cleanupUser(t, db, user.ID)
-	bot, _ := db.CreateBot(user.ID, "", "bot-msg2", "tok", "", "")
 
-	// Save messages
+	creds, _ := json.Marshal(map[string]string{"mock": "true"})
+	bot, _ := db.CreateBot(user.ID, "", "mock", creds)
+
+	payload, _ := json.Marshal(map[string]string{"content": "hello"})
 	for i := 0; i < 5; i++ {
 		db.SaveMessage(&Message{
-			BotDBID: bot.ID, Direction: "inbound", FromUserID: "user@im.wechat",
-			MessageType: 1, Content: "hello",
+			BotID: bot.ID, Direction: "inbound", Sender: "user@im.wechat",
+			MsgType: "text", Payload: payload,
 		})
 	}
-	subID := "sub-123"
+	chID := "ch-123"
+	replyPayload, _ := json.Marshal(map[string]string{"content": "reply"})
 	db.SaveMessage(&Message{
-		BotDBID: bot.ID, Direction: "outbound", ToUserID: "user@im.wechat",
-		MessageType: 1, Content: "reply", SublevelID: &subID,
+		BotID: bot.ID, Direction: "outbound", Recipient: "user@im.wechat",
+		MsgType: "text", Payload: replyPayload, ChannelID: &chID,
 	})
 
 	msgs, err := db.ListMessages(bot.ID, 10, 0)
@@ -177,18 +176,16 @@ func TestMessageCRUD(t *testing.T) {
 		t.Fatalf("list: got %d msgs, err=%v", len(msgs), err)
 	}
 
-	// By user
-	byUser, err := db.ListMessagesByUser(bot.ID, "user@im.wechat", 10)
+	byUser, err := db.ListMessagesBySender(bot.ID, "user@im.wechat", 10)
 	if err != nil || len(byUser) < 5 {
-		t.Fatalf("by user: got %d", len(byUser))
+		t.Fatalf("by sender: got %d", len(byUser))
 	}
 
-	// Since (replay)
 	since, err := db.GetMessagesSince(bot.ID, msgs[len(msgs)-1].ID, 100)
 	if err != nil {
 		t.Fatalf("since: %v", err)
 	}
-	if len(since) != 5 { // all except the oldest one
+	if len(since) != 5 {
 		t.Errorf("since got %d, want 5", len(since))
 	}
 
@@ -217,5 +214,34 @@ func TestCredentialCRUD(t *testing.T) {
 	creds, _ = db.GetCredentialsByUserID(user.ID)
 	if creds[0].SignCount != 5 {
 		t.Errorf("sign_count = %d", creds[0].SignCount)
+	}
+}
+
+func TestSystemConfig(t *testing.T) {
+	db := testDB(t)
+
+	if err := db.SetConfig("oauth.github.client_id", "test-id"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if err := db.SetConfig("oauth.github.client_secret", "test-secret"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	val, err := db.GetConfig("oauth.github.client_id")
+	if err != nil || val != "test-id" {
+		t.Errorf("get = %q, err=%v", val, err)
+	}
+
+	configs, err := db.ListConfigByPrefix("oauth.")
+	if err != nil || len(configs) < 2 {
+		t.Errorf("list = %v, err=%v", configs, err)
+	}
+
+	db.DeleteConfig("oauth.github.client_id")
+	db.DeleteConfig("oauth.github.client_secret")
+
+	val, _ = db.GetConfig("oauth.github.client_id")
+	if val != "" {
+		t.Errorf("after delete = %q", val)
 	}
 }
