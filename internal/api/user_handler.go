@@ -15,7 +15,7 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := auth.UserIDFromContext(r.Context())
 		user, err := s.DB.GetUserByID(userID)
-		if err != nil || user.Role != database.RoleAdmin {
+		if err != nil || !database.IsAdmin(user.Role) {
 			jsonError(w, "admin required", http.StatusForbidden)
 			return
 		}
@@ -85,9 +85,20 @@ func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Protect superadmin
+	target, err := s.DB.GetUserByID(id)
+	if err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if target.Role == database.RoleSuperAdmin {
+		jsonError(w, "cannot change superadmin role", http.StatusForbidden)
+		return
+	}
+
 	// Prevent self-demotion
 	currentUserID := auth.UserIDFromContext(r.Context())
-	if id == currentUserID && req.Role != database.RoleAdmin {
+	if id == currentUserID && !database.IsAdmin(req.Role) {
 		jsonError(w, "cannot demote yourself", http.StatusBadRequest)
 		return
 	}
@@ -113,6 +124,17 @@ func (s *Server) handleUpdateUserStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Protect superadmin
+	target, err := s.DB.GetUserByID(id)
+	if err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if target.Role == database.RoleSuperAdmin {
+		jsonError(w, "cannot disable superadmin", http.StatusForbidden)
+		return
+	}
+
 	// Prevent self-disable
 	currentUserID := auth.UserIDFromContext(r.Context())
 	if id == currentUserID {
@@ -134,6 +156,17 @@ func (s *Server) handleUpdateUserStatus(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+
+	// Protect superadmin
+	target, err := s.DB.GetUserByID(id)
+	if err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if target.Role == database.RoleSuperAdmin {
+		jsonError(w, "cannot delete superadmin", http.StatusForbidden)
+		return
+	}
 
 	currentUserID := auth.UserIDFromContext(r.Context())
 	if id == currentUserID {

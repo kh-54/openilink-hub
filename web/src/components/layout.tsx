@@ -40,7 +40,7 @@ export function Layout() {
 
   function renderNav(items: NavItem[]) {
     return items.map((item) => {
-      if (item.adminOnly && user.role !== "admin") return null;
+      if (item.adminOnly && user.role !== "admin" && user.role !== "superadmin") return null;
       const active = isActive(item.path);
       return (
         <Link key={item.path} to={item.path}
@@ -84,7 +84,7 @@ export function Layout() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium truncate">{user.username}</p>
-              <p className="text-[10px] text-muted-foreground">{user.role === "admin" ? "管理员" : "成员"}</p>
+              <p className="text-[10px] text-muted-foreground">{user.role === "superadmin" ? "超级管理员" : user.role === "admin" ? "管理员" : "成员"}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">

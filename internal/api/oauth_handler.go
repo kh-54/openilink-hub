@@ -369,7 +369,7 @@ func (s *Server) findOrCreateOAuthUser(provider, providerID, username, email, av
 		role := database.RoleMember
 		count, _ := s.DB.UserCount()
 		if count == 0 {
-			role = database.RoleAdmin
+			role = database.RoleSuperAdmin
 		}
 		uname := provider + "_" + username
 		if _, err := s.DB.GetUserByUsername(uname); err == nil {

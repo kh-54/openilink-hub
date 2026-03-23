@@ -3,12 +3,18 @@ package database
 import "github.com/google/uuid"
 
 const (
-	RoleAdmin  = "admin"
-	RoleMember = "member"
+	RoleSuperAdmin = "superadmin" // first user, cannot be deleted/demoted
+	RoleAdmin      = "admin"
+	RoleMember     = "member"
 
 	StatusActive   = "active"
 	StatusDisabled = "disabled"
 )
+
+// IsAdmin returns true if the user has admin or superadmin role.
+func IsAdmin(role string) bool {
+	return role == RoleSuperAdmin || role == RoleAdmin
+}
 
 type User struct {
 	ID           string `json:"id"`
@@ -42,7 +48,7 @@ func (db *DB) CreateUser(username, displayName string) (*User, error) {
 	var count int
 	db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	if count == 0 {
-		role = RoleAdmin
+		role = RoleSuperAdmin
 	}
 
 	_, err := db.Exec(

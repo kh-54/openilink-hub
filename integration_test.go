@@ -339,8 +339,8 @@ func TestRegisterAndLogin(t *testing.T) {
 	env.register("admin", "password123")
 	code, me := env.get("/api/me")
 	assertCode(t, "GET /me", code, 200)
-	if me["role"] != "admin" {
-		t.Errorf("first user role = %v, want admin", me["role"])
+	if me["role"] != "superadmin" {
+		t.Errorf("first user role = %v, want superadmin", me["role"])
 	}
 
 	// Logout
@@ -928,29 +928,29 @@ func TestAdminUserManagement(t *testing.T) {
 	code, _ = env.put("/api/admin/users/"+newID+"/role", map[string]string{"role": "admin"})
 	assertCode(t, "update role", code, 200)
 
-	// Can't demote self
+	// Superadmin cannot be demoted
 	code, _ = env.put("/api/admin/users/"+adminID+"/role", map[string]string{"role": "member"})
-	assertCode(t, "self demote", code, 400)
+	assertCode(t, "superadmin demote", code, 403)
 
 	// Update status
 	code, _ = env.put("/api/admin/users/"+newID+"/status", map[string]string{"status": "disabled"})
 	assertCode(t, "disable user", code, 200)
 
-	// Can't disable self
+	// Superadmin cannot be disabled
 	code, _ = env.put("/api/admin/users/"+adminID+"/status", map[string]string{"status": "disabled"})
-	assertCode(t, "self disable", code, 400)
+	assertCode(t, "superadmin disable", code, 403)
 
 	// Reset password
-	code, _ = env.put("/api/admin/users/"+newID+"/password", map[string]string{"password": "newpass123"})
+	code, _ = env.put("/api/admin/users/"+newID+"/password", nil)
 	assertCode(t, "reset password", code, 200)
 
 	// Delete user
 	code, _ = env.del("/api/admin/users/" + newID)
 	assertCode(t, "delete user", code, 200)
 
-	// Can't delete self
+	// Superadmin cannot be deleted
 	code, _ = env.del("/api/admin/users/" + adminID)
-	assertCode(t, "self delete", code, 400)
+	assertCode(t, "superadmin delete", code, 403)
 }
 
 func TestAdminRequiresAdminRole(t *testing.T) {

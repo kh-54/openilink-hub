@@ -52,7 +52,7 @@ func (s *Server) handlePasswordRegister(w http.ResponseWriter, r *http.Request) 
 	role := database.RoleMember
 	count, _ := s.DB.UserCount()
 	if count == 0 {
-		role = database.RoleAdmin
+		role = database.RoleSuperAdmin
 	}
 
 	hash := auth.HashPassword(req.Password)
@@ -131,7 +131,7 @@ func (s *Server) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 	role := database.RoleMember
 	count, _ := s.DB.UserCount()
 	if count == 0 {
-		role = database.RoleAdmin
+		role = database.RoleSuperAdmin
 	}
 
 	user, err := s.DB.CreateUserFull(req.Username, "", displayName, "", role)

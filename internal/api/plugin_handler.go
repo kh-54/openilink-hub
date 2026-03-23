@@ -162,7 +162,7 @@ func (s *Server) handleListPlugins(w http.ResponseWriter, r *http.Request) {
 	// Only admin can see pending/rejected
 	if status != "approved" {
 		user := s.optionalUser(r)
-		if user == nil || user.Role != database.RoleAdmin {
+		if user == nil || !database.IsAdmin(user.Role) {
 			status = "approved"
 		}
 	}
@@ -195,7 +195,7 @@ func (s *Server) handleGetPlugin(w http.ResponseWriter, r *http.Request) {
 	if user != nil {
 		userID = user.ID
 	}
-	isAdmin := user != nil && user.Role == database.RoleAdmin
+	isAdmin := user != nil && database.IsAdmin(user.Role)
 	isOwner := userID != "" && plugin.SubmittedBy == userID
 
 	// Only admin and owner can see pending/rejected plugins

@@ -62,7 +62,7 @@ export function SettingsPage() {
         <div className="text-sm space-y-1">
           <p><span className="text-muted-foreground">用户名：</span>{user.username}</p>
           <p><span className="text-muted-foreground">显示名：</span>{user.display_name}</p>
-          <p><span className="text-muted-foreground">角色：</span>{user.role === "admin" ? "管理员" : "成员"}</p>
+          <p><span className="text-muted-foreground">角色：</span>{user.role === "superadmin" ? "超级管理员" : user.role === "admin" ? "管理员" : "成员"}</p>
         </div>
       </Card>
 

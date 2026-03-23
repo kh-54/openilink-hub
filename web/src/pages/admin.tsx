@@ -172,20 +172,22 @@ function UsersTab() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-medium">{u.username}</span>
-                  <span className={`text-[10px] px-1 rounded ${u.role === "admin" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
-                    {u.role === "admin" ? "管理员" : "成员"}
+                  <span className={`text-[10px] px-1 rounded ${u.role === "superadmin" ? "bg-yellow-500/10 text-yellow-600" : u.role === "admin" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                    {u.role === "superadmin" ? "超级管理员" : u.role === "admin" ? "管理员" : "成员"}
                   </span>
                   {u.status === "disabled" && <span className="text-[10px] px-1 rounded bg-destructive/10 text-destructive">已禁用</span>}
                 </div>
                 {u.email && <p className="text-[10px] text-muted-foreground">{u.email}</p>}
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => handleToggleRole(u)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-secondary cursor-pointer">{u.role === "admin" ? "降级" : "升级"}</button>
-              <button onClick={() => handleToggleStatus(u)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-secondary cursor-pointer">{u.status === "active" ? "禁用" : "启用"}</button>
-              <button onClick={() => handleResetPassword(u)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-secondary cursor-pointer">重置密码</button>
-              <button onClick={() => handleDelete(u)} className="text-[10px] text-destructive px-1.5 py-0.5 rounded hover:bg-destructive/10 cursor-pointer">删除</button>
-            </div>
+            {u.role !== "superadmin" && (
+              <div className="flex items-center gap-1">
+                <button onClick={() => handleToggleRole(u)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-secondary cursor-pointer">{u.role === "admin" ? "降级" : "升级"}</button>
+                <button onClick={() => handleToggleStatus(u)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-secondary cursor-pointer">{u.status === "active" ? "禁用" : "启用"}</button>
+                <button onClick={() => handleResetPassword(u)} className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-secondary cursor-pointer">重置密码</button>
+                <button onClick={() => handleDelete(u)} className="text-[10px] text-destructive px-1.5 py-0.5 rounded hover:bg-destructive/10 cursor-pointer">删除</button>
+              </div>
+            )}
           </div>
         ))}
       </div>
