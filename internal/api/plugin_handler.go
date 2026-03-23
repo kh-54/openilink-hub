@@ -75,7 +75,7 @@ func (s *Server) handleSubmitPlugin(w http.ResponseWriter, r *http.Request) {
 
 	configSchema, _ := json.Marshal(meta.Config)
 
-	plugin, err := s.DB.CreatePlugin(&database.Plugin{
+	newPlugin := &database.Plugin{
 		Name:           meta.Name,
 		Description:    meta.Description,
 		Author:         meta.Author,
@@ -92,10 +92,24 @@ func (s *Server) handleSubmitPlugin(w http.ResponseWriter, r *http.Request) {
 		Script:         script,
 		ConfigSchema:   configSchema,
 		SubmittedBy:    userID,
-	})
-	if err != nil {
-		jsonError(w, "save failed", http.StatusInternalServerError)
-		return
+	}
+
+	// Check for existing pending plugin by same submitter + name → update instead of creating duplicate
+	var plugin *database.Plugin
+	existing, _ := s.DB.FindPendingPlugin(userID, meta.Name)
+	if existing != nil {
+		if err := s.DB.UpdatePlugin(existing.ID, newPlugin); err != nil {
+			jsonError(w, "update failed", http.StatusInternalServerError)
+			return
+		}
+		plugin, _ = s.DB.GetPlugin(existing.ID)
+	} else {
+		var err error
+		plugin, err = s.DB.CreatePlugin(newPlugin)
+		if err != nil {
+			jsonError(w, "save failed", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

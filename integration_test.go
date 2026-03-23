@@ -3062,3 +3062,45 @@ func TestWebhookPluginVersionUpdate(t *testing.T) {
 		t.Errorf("after upgrade: %s, want %s", ch2.WebhookConfig.PluginID, id2)
 	}
 }
+
+func TestWebhookPluginResubmitOverwritesPending(t *testing.T) {
+	env := setup(t)
+	defer env.close()
+
+	env.register("resubuser", "password123")
+
+	// Submit v1
+	code, r1 := env.postCode("/api/webhook-plugins/submit", map[string]string{
+		"script": "// @name ResubPlugin\n// @version 1.0.0\nfunction onRequest(ctx) {}",
+	})
+	assertCode(t, "submit v1", code, 200)
+	id1 := r1["id"].(string)
+	if r1["version"] != "1.0.0" {
+		t.Errorf("v1 version = %v", r1["version"])
+	}
+
+	// Submit again with same name — should overwrite, not duplicate
+	code, r2 := env.postCode("/api/webhook-plugins/submit", map[string]string{
+		"script": "// @name ResubPlugin\n// @version 2.0.0\nfunction onRequest(ctx) { /* updated */ }",
+	})
+	assertCode(t, "submit v2", code, 200)
+	id2 := r2["id"].(string)
+
+	// Should be same ID (overwritten, not new)
+	if id1 != id2 {
+		t.Errorf("resubmit created new ID: %s vs %s — should overwrite", id1, id2)
+	}
+	if r2["version"] != "2.0.0" {
+		t.Errorf("v2 version = %v", r2["version"])
+	}
+
+	// Verify only one pending plugin exists
+	code, pending := env.getList("/api/webhook-plugins?status=pending")
+	// Non-admin sees approved, so use admin to check
+	env.db.Exec("UPDATE users SET role = 'admin' WHERE username = 'resubuser'")
+	code, pending = env.getList("/api/webhook-plugins?status=pending")
+	assertCode(t, "pending list", code, 200)
+	if len(pending) != 1 {
+		t.Errorf("expected 1 pending, got %d", len(pending))
+	}
+}

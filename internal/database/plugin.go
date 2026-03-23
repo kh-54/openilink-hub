@@ -94,6 +94,26 @@ func (db *DB) CreatePlugin(p *Plugin) (*Plugin, error) {
 	return p, nil
 }
 
+// FindPendingPlugin finds an existing pending plugin by submitter + name.
+func (db *DB) FindPendingPlugin(submittedBy, name string) (*Plugin, error) {
+	return scanPlugin(db.QueryRow("SELECT "+pluginSelectCols+pluginFromJoin+
+		" WHERE p.submitted_by = $1 AND p.name = $2 AND p.status = 'pending'", submittedBy, name))
+}
+
+// UpdatePlugin updates an existing plugin's content (for resubmission).
+func (db *DB) UpdatePlugin(id string, p *Plugin) error {
+	_, err := db.Exec(`UPDATE plugins SET
+		description=$1, author=$2, version=$3, namespace=$4, icon=$5, license=$6, homepage=$7,
+		match_types=$8, connect_domains=$9, grant_perms=$10,
+		github_url=$11, commit_hash=$12, script=$13, config_schema=$14,
+		status='pending', reject_reason='', reviewed_by='', updated_at=NOW()
+		WHERE id=$15`,
+		p.Description, p.Author, p.Version, p.Namespace, p.Icon, p.License, p.Homepage,
+		p.MatchTypes, p.ConnectDomains, p.GrantPerms,
+		p.GithubURL, p.CommitHash, p.Script, p.ConfigSchema, id)
+	return err
+}
+
 func (db *DB) GetPlugin(id string) (*Plugin, error) {
 	return scanPlugin(db.QueryRow("SELECT "+pluginSelectCols+pluginFromJoin+" WHERE p.id = $1", id))
 }
