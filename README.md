@@ -1,18 +1,104 @@
+<div align="center">
+
 # OpenILink Hub
 
-多 Bot 管理与消息中继系统。通过扫码绑定微信 Bot，将消息实时转发给下游服务。
+### Self-hosted WeChat Bot Management & Message Relay Platform
+
+开源、可自托管的多微信 Bot 管理平台，支持 WebSocket / Webhook / AI 自动回复三种消息下发方式，<br>
+内置 Passkey 无密码登录、JavaScript 插件引擎、7 种语言 SDK，轻松接入你的业务系统。
+
+[![License](https://img.shields.io/github/license/openilink/openilink-hub?style=flat-square)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](docker-compose.yml)
+[![GitHub Stars](https://img.shields.io/github/stars/openilink/openilink-hub?style=flat-square&logo=github)](https://github.com/openilink/openilink-hub/stargazers)
+
+[English](#english) · [在线体验](https://hub.openilink.com) · [快速开始](#快速开始) · [SDK 文档](#sdk-生态) · [插件市场](#插件系统)
+
+</div>
+
+---
+
+## 为什么选择 OpenILink Hub？
+
+| | OpenILink Hub | 传统方案 |
+|---|---|---|
+| **部署方式** | `docker compose up -d` 一键启动 | 需要复杂的依赖配置 |
+| **多 Bot 管理** | 扫码绑定，集中管理多个微信号 | 通常只支持单个 Bot |
+| **消息下发** | WebSocket + Webhook + AI 三通道并行 | 单一通道 |
+| **认证方式** | Passkey 无密码 + OAuth + 传统密码 | 仅密码认证 |
+| **可扩展性** | JavaScript 插件引擎 + 7 种语言 SDK | 硬编码，难以扩展 |
+| **开源协议** | MIT，无商业限制 | 部分闭源或限制商用 |
+
+## 核心特性
+
+**多 Bot 集中管理**
+扫描二维码即可绑定微信号，支持同时管理多个 Bot，统一面板监控在线状态与消息统计。
+
+**三通道消息下发**
+- **WebSocket** — 毫秒级实时推送，适合需要即时响应的场景
+- **Webhook** — HTTP 回调 + JavaScript 中间件，灵活对接任意服务
+- **AI 自动回复** — 接入 OpenAI 兼容 API，Bot 自动与用户对话
+
+**JavaScript 插件引擎**
+内置 JS 运行时（goja），Webhook 支持 `onRequest` / `onResponse` 两阶段钩子，自定义消息过滤、转换、路由逻辑。提供插件市场，社区贡献开箱即用。
+
+**现代化认证体系**
+支持 Passkey（WebAuthn）生物识别 / 硬件密钥无密码登录，同时集成 GitHub、LinuxDo OAuth，多因素安全保障。
+
+**Channel 精细化控制**
+每个 Bot 下可创建多个 Channel，独立 API Key、独立过滤规则（用户 / 关键词 / 消息类型），实现消息的精确路由。
+
+**完善的管理后台**
+用户管理、角色权限、OAuth 配置、AI 全局设置，管理员一站式掌控。
+
+## 架构总览
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                      OpenILink Hub                       │
+│                                                          │
+│   ┌─────────┐    ┌──────────┐    ┌───────────────────┐   │
+│   │  微信号  │───▶│ Provider │───▶│  Message Broker   │   │
+│   │ (扫码绑定)│    │ (iLink)  │    │                   │   │
+│   └─────────┘    └──────────┘    │  ┌─── WebSocket ──▶ 实时客户端  │
+│                                  │  │                 │   │
+│   ┌─────────┐    ┌──────────┐    │  ├─── Webhook ────▶ 第三方服务  │
+│   │  Web UI │───▶│ REST API │    │  │  (JS 中间件)    │   │
+│   │ (React) │    │  (Go)    │    │  └─── AI Sink ────▶ 自动回复    │
+│   └─────────┘    └──────────┘    └───────────────────┘   │
+│                                                          │
+│   ┌──────────┐   ┌──────────┐   ┌──────────┐            │
+│   │PostgreSQL│   │  MinIO   │   │  Passkey  │            │
+│   │  (数据)  │   │ (媒体存储)│   │(WebAuthn) │            │
+│   └──────────┘   └──────────┘   └──────────┘            │
+└──────────────────────────────────────────────────────────┘
+```
 
 ## 快速开始
+
+### Docker Compose（推荐）
 
 ```bash
 docker compose up -d
 ```
 
-访问 `http://localhost:9800`，首个注册用户自动成为管理员。
+访问 `http://localhost:9800`，**首个注册用户自动成为管理员**。
 
-## 部署
+### 从源码构建
 
-### Docker Compose（推荐）
+```bash
+# 构建前端
+cd web && npm ci && npm run build && cd ..
+
+# 构建并运行
+go build -o openilink-hub .
+DATABASE_URL="postgres://user:pass@localhost:5432/openilink" \
+SECRET="$(openssl rand -hex 32)" \
+./openilink-hub
+```
+
+### Docker Compose 完整配置
 
 ```yaml
 services:
@@ -31,14 +117,9 @@ services:
       - "9800:9800"
     environment:
       DATABASE_URL: postgres://openilink:<密码>@postgres:5432/openilink?sslmode=disable
-      RP_ORIGIN: https://hub.example.com    # 必须与实际访问地址一致
-      RP_ID: hub.example.com                # 域名部分
+      RP_ORIGIN: https://hub.example.com
+      RP_ID: hub.example.com
       SECRET: <随机字符串>
-      # OAuth（可选，见下方配置说明）
-      # GITHUB_CLIENT_ID: ...
-      # GITHUB_CLIENT_SECRET: ...
-      # LINUXDO_CLIENT_ID: ...
-      # LINUXDO_CLIENT_SECRET: ...
     depends_on:
       - postgres
 
@@ -46,24 +127,55 @@ volumes:
   pgdata:
 ```
 
-前面加 nginx / Caddy 做 HTTPS 反代，将 443 转发到 9800。
+前置 Nginx / Caddy 做 HTTPS 反向代理，将 443 端口转发到 9800。
 
-### 直接运行
+## SDK 生态
 
-```bash
-# 构建前端
-cd web && npm ci && npm run build && cd ..
+OpenILink 提供 **7 种语言的官方 SDK**，方便你用熟悉的技术栈快速接入：
 
-# 构建后端
-go build -o openilink-hub .
+| 语言 | 仓库 | 安装方式 |
+|------|------|---------|
+| **Go** | [openilink-sdk-go](https://github.com/openilink/openilink-sdk-go) | `go get github.com/openilink/openilink-sdk-go` |
+| **Node.js** | [openilink-sdk-node](https://github.com/openilink/openilink-sdk-node) | `npm install openilink-sdk` |
+| **Python** | [openilink-sdk-python](https://github.com/openilink/openilink-sdk-python) | `pip install openilink` |
+| **PHP** | [openilink-sdk-php](https://github.com/openilink/openilink-sdk-php) | `composer require openilink/sdk` |
+| **Java** | [openilink-sdk-java](https://github.com/openilink/openilink-sdk-java) | Maven / Gradle |
+| **C#** | [openilink-sdk-csharp](https://github.com/openilink/openilink-sdk-csharp) | NuGet |
+| **Lua** | [openilink-sdk-lua](https://github.com/openilink/openilink-sdk-lua) | LuaRocks |
 
-# 运行
-DATABASE_URL="postgres://user:pass@localhost:5432/openilink" \
-RP_ORIGIN="https://hub.example.com" \
-RP_ID="hub.example.com" \
-SECRET="$(openssl rand -hex 32)" \
-./openilink-hub
+### 相关项目
+
+| 项目 | 说明 |
+|------|------|
+| [openilink-tg](https://github.com/openilink/openilink-tg) | Telegram Bot 集成，微信消息转发到 Telegram |
+| [openilink-webhook-plugins](https://github.com/openilink/openilink-webhook-plugins) | 官方 Webhook 插件仓库，社区贡献的开箱即用插件 |
+| [openclaw-channel-openilink](https://github.com/openilink/openclaw-channel-openilink) | OpenClaw 平台的 OpenILink 适配器 |
+
+## 插件系统
+
+Webhook 支持 JavaScript 插件，通过 `onRequest` / `onResponse` 钩子实现消息的自定义处理：
+
+```javascript
+// @name         消息转发到飞书
+// @description  将微信消息格式化后转发到飞书群
+// @match        text
+// @connect      open.feishu.cn
+// @grant        skip
+
+function onRequest(ctx) {
+  ctx.method = "POST";
+  ctx.url = "https://open.feishu.cn/open-apis/bot/v2/hook/xxx";
+  ctx.headers["Content-Type"] = "application/json";
+  ctx.body = JSON.stringify({
+    msg_type: "text",
+    content: { text: ctx.message.text }
+  });
+}
 ```
+
+**插件权限声明**：`@match` 控制消息类型过滤，`@connect` 限制可访问的域名，`@grant` 声明功能权限（`reply` | `skip` | `none`）。
+
+内置插件市场支持社区提交、管理员审核，详见 [Webhook 插件开发文档](docs/webhook-plugin-skill.md)。
 
 ## 环境变量
 
@@ -71,59 +183,92 @@ SECRET="$(openssl rand -hex 32)" \
 |------|--------|------|
 | `LISTEN` | `:9800` | 监听地址 |
 | `DATABASE_URL` | `postgres://localhost:5432/openilink` | PostgreSQL 连接串 |
-| `RP_ORIGIN` | `http://localhost:9800` | 站点源地址，必须与浏览器访问地址一致（含协议） |
+| `RP_ORIGIN` | `http://localhost:9800` | 站点源地址（必须与浏览器访问地址一致） |
 | `RP_ID` | `localhost` | WebAuthn RP ID，通常为域名 |
-| `RP_NAME` | `OpenILink Hub` | 站点显示名称 |
-| `SECRET` | `change-me-in-production` | 服务端密钥，生产环境必须修改 |
+| `SECRET` | `change-me-in-production` | 服务端密钥，**生产环境必须修改** |
 | `GITHUB_CLIENT_ID` | — | GitHub OAuth Client ID |
 | `GITHUB_CLIENT_SECRET` | — | GitHub OAuth Client Secret |
 | `LINUXDO_CLIENT_ID` | — | LinuxDo OAuth Client ID |
 | `LINUXDO_CLIENT_SECRET` | — | LinuxDo OAuth Client Secret |
+| `STORAGE_ENDPOINT` | — | MinIO / S3 兼容存储端点 |
+| `STORAGE_ACCESS_KEY` | — | 存储访问密钥 |
+| `STORAGE_SECRET_KEY` | — | 存储密钥 |
+| `STORAGE_BUCKET` | — | 存储桶名称 |
+| `STORAGE_PUBLIC_URL` | — | 存储公开访问 URL |
 
 ## 配置 OAuth 登录
 
-OAuth 为可选功能。配置后用户可使用第三方账号登录或绑定到已有账号。
+OAuth 为可选功能，配置后用户可使用第三方账号登录或绑定到已有账号。
 
-### GitHub
+<details>
+<summary><b>GitHub OAuth</b></summary>
 
 1. 前往 [GitHub Developer Settings](https://github.com/settings/developers) → OAuth Apps → New OAuth App
 2. 填写：
-   - **Application name**: OpenILink Hub（随意）
    - **Homepage URL**: `https://hub.example.com`
    - **Authorization callback URL**: `https://hub.example.com/api/auth/oauth/github/callback`
-3. 创建后获取 Client ID 和 Client Secret
-4. 设置环境变量 `GITHUB_CLIENT_ID` 和 `GITHUB_CLIENT_SECRET`
+3. 获取 Client ID 和 Client Secret，设置对应环境变量
 
-### LinuxDo
+</details>
+
+<details>
+<summary><b>LinuxDo OAuth</b></summary>
 
 1. 前往 [connect.linux.do](https://connect.linux.do) 创建应用
-2. 回调地址填：`https://hub.example.com/api/auth/oauth/linuxdo/callback`
-3. 获取 Client ID 和 Client Secret
-4. 设置环境变量 `LINUXDO_CLIENT_ID` 和 `LINUXDO_CLIENT_SECRET`
+2. 回调地址：`https://hub.example.com/api/auth/oauth/linuxdo/callback`
+3. 获取 Client ID 和 Client Secret，设置对应环境变量
 
-### 注意事项
+</details>
 
-- 回调地址格式固定为 `{RP_ORIGIN}/api/auth/oauth/{provider}/callback`
-- `RP_ORIGIN` 必须与实际访问地址完全一致（包括协议和端口）
-- 未配置 Client ID 的 provider 不会出现在登录页
-- 已登录用户可在「设置」页面绑定/解绑第三方账号
+> 回调地址格式：`{RP_ORIGIN}/api/auth/oauth/{provider}/callback`，`RP_ORIGIN` 必须与实际访问地址完全一致。
 
-## 架构
+## Provider 扩展
 
-```
-用户 → 扫码绑定 Bot → Bot 收到微信消息 → 按 Channel 规则过滤 → WebSocket 推送到下游服务
-                                                              ↑
-                                          Channel (API Key 认证，可配过滤规则)
-```
-
-### Provider 扩展
-
-Bot 连接通过 Provider 接口抽象（`internal/provider/`），当前实现了 iLink provider。新增 provider 只需：
+Bot 连接通过 Provider 接口抽象（`internal/provider/`），当前实现了 iLink Provider。新增 Provider 只需三步：
 
 1. 在 `internal/provider/<name>/` 下实现 `provider.Provider` 接口
 2. 在 `init()` 中调用 `provider.Register("name", factory)`
 3. 在 `main.go` 中 `import _ ".../<name>"` 注册
 
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 后端 | Go 1.25, PostgreSQL 17, gorilla/websocket, goja (JS VM) |
+| 前端 | React 19, Vite, TypeScript, Tailwind CSS |
+| 认证 | WebAuthn (Passkey), OAuth 2.0, 密码 |
+| 存储 | MinIO / S3 兼容对象存储 |
+| 部署 | Docker, Docker Compose |
+
+## 参与贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+- 插件贡献请提交到 [openilink-webhook-plugins](https://github.com/openilink/openilink-webhook-plugins)
+- SDK 问题请到对应语言的仓库反馈
+
 ## License
 
-MIT
+[MIT](LICENSE) — 自由使用，无商业限制。
+
+---
+
+<div align="center">
+
+**[OpenILink](https://openilink.com)** · 让微信 Bot 接入更简单
+
+</div>
+
+---
+
+<a name="english"></a>
+
+## English
+
+**OpenILink Hub** is a self-hosted, open-source WeChat Bot management and message relay platform. It enables you to bind WeChat accounts via QR code scanning and forward messages to downstream services through WebSocket, Webhook (with JavaScript middleware), or AI auto-reply.
+
+**Key Features:** Multi-bot management, Passkey (WebAuthn) passwordless login, GitHub/LinuxDo OAuth, JavaScript plugin engine, plugin marketplace, and official SDKs for Go, Node.js, Python, PHP, Java, C#, and Lua.
+
+**Quick Start:** `docker compose up -d` → visit `http://localhost:9800`
+
+For full documentation, see the Chinese sections above or visit [hub.openilink.com](https://hub.openilink.com).
