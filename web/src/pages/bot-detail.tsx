@@ -1102,7 +1102,7 @@ function CopyRow({ label, value, copied, onCopy }: { label: string; value: strin
 
 function BotSettingsTab({ bot, onUpdate }: { bot: any; onUpdate: () => void }) {
   const [reminderEnabled, setReminderEnabled] = useState(bot.reminder_hours > 0);
-  const [reminderHours, setReminderHours] = useState(bot.reminder_hours || 23);
+  const [reminderHours, setReminderHours] = useState(bot.reminder_hours || 1);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -1138,10 +1138,10 @@ function BotSettingsTab({ bot, onUpdate }: { bot: any; onUpdate: () => void }) {
             <input
               type="number"
               value={reminderHours}
-              onChange={(e) => setReminderHours(Math.max(1, Math.min(168, parseInt(e.target.value) || 23)))}
+              onChange={(e) => setReminderHours(Math.max(1, Math.min(12, parseInt(e.target.value) || 1)))}
               className="w-16 h-7 rounded border px-2 text-xs text-center"
               min={1}
-              max={168}
+              max={12}
             />
             <span className="text-xs text-muted-foreground">小时后提醒</span>
             <span className="text-[10px] text-muted-foreground ml-2">

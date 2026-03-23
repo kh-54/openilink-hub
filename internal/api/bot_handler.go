@@ -246,8 +246,8 @@ func (s *Server) handleUpdateBot(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.ReminderHours != nil {
 		hours := *req.ReminderHours
-		if hours < 0 || hours > 168 { // max 7 days
-			jsonError(w, "reminder_hours must be 0-168", http.StatusBadRequest)
+		if hours < 0 || hours > 12 {
+			jsonError(w, "reminder_hours must be 0-12", http.StatusBadRequest)
 			return
 		}
 		if err := s.DB.UpdateBotReminder(botID, hours); err != nil {
