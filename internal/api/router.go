@@ -148,5 +148,5 @@ func (s *Server) Handler() http.Handler {
 		mux.Handle("/", handler)
 	}
 
-	return cors(mux)
+	return recovery(requestLogger(cors(mux)))
 }
