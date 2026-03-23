@@ -119,7 +119,9 @@ Each item has:
 
 ## Examples
 
-### 1. Feishu (Lark) Notification
+### 1. Notification Forward (onRequest)
+
+Transforms the request body to match the target service's format. Works for Feishu, DingTalk, Slack, Discord, WeCom — just change the JSON structure.
 
 ```javascript
 // @name Feishu Notification
@@ -137,73 +139,9 @@ function onRequest(ctx) {
 }
 ```
 
-### 2. DingTalk Notification
+### 2. AI Auto-Reply (onRequest + onResponse + reply)
 
-```javascript
-// @name DingTalk Notification
-// @description Forward WeChat messages to DingTalk group bot
-// @author openilink
-// @version 1.0.0
-
-function onRequest(ctx) {
-  ctx.req.body = JSON.stringify({
-    msgtype: "text",
-    text: {
-      content: ctx.msg.sender + ": " + ctx.msg.content
-    }
-  });
-}
-```
-
-### 3. Slack Incoming Webhook
-
-```javascript
-// @name Slack Notification
-// @description Forward WeChat messages to Slack channel
-// @author openilink
-// @version 1.0.0
-
-function onRequest(ctx) {
-  ctx.req.body = JSON.stringify({
-    text: "*" + ctx.msg.sender + "*: " + ctx.msg.content
-  });
-}
-```
-
-### 4. Discord Webhook
-
-```javascript
-// @name Discord Notification
-// @description Forward WeChat messages to Discord channel
-// @author openilink
-// @version 1.0.0
-
-function onRequest(ctx) {
-  ctx.req.body = JSON.stringify({
-    content: "**" + ctx.msg.sender + "**: " + ctx.msg.content
-  });
-}
-```
-
-### 5. WeCom (Enterprise WeChat) Bot
-
-```javascript
-// @name WeCom Notification
-// @description Forward to Enterprise WeChat group bot
-// @author openilink
-// @version 1.0.0
-
-function onRequest(ctx) {
-  ctx.req.body = JSON.stringify({
-    msgtype: "text",
-    text: {
-      content: ctx.msg.sender + ": " + ctx.msg.content
-    }
-  });
-}
-```
-
-### 6. ChatGPT Auto-Reply
+Demonstrates the full two-phase flow: transform the request, then parse the response and reply back through the bot.
 
 ```javascript
 // @name ChatGPT Auto-Reply
@@ -233,7 +171,9 @@ function onResponse(ctx) {
 }
 ```
 
-### 7. Keyword Filter + Forward
+### 3. Conditional Filter (skip)
+
+Uses `skip()` to cancel delivery when conditions aren't met.
 
 ```javascript
 // @name Keyword Filter
@@ -258,31 +198,6 @@ function onRequest(ctx) {
   ctx.req.body = JSON.stringify({
     text: "[ALERT] " + ctx.msg.sender + ": " + ctx.msg.content
   });
-}
-```
-
-### 8. Auto-Reply with Response Parsing
-
-```javascript
-// @name Smart Reply
-// @description Forward to custom API and reply with response
-// @author openilink
-// @version 1.0.0
-
-function onRequest(ctx) {
-  ctx.req.body = JSON.stringify({
-    question: ctx.msg.content,
-    user: ctx.msg.sender
-  });
-}
-
-function onResponse(ctx) {
-  if (ctx.res.status === 200) {
-    var data = JSON.parse(ctx.res.body);
-    if (data.answer) {
-      reply(data.answer);
-    }
-  }
 }
 ```
 
