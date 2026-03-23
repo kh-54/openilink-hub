@@ -328,14 +328,39 @@ function WebhookTab({ channel, botId, onRefresh }: { channel: any; botId: string
       {scriptMode === "plugin" && (
         <div className="space-y-2">
           {pluginInfo ? (
-            <div className="flex items-center justify-between p-2 rounded border bg-card">
-              <div className="text-xs">
-                <span>{pluginInfo.icon} <strong>{pluginInfo.name}</strong> v{pluginInfo.version}</span>
-                <p className="text-[10px] text-muted-foreground">{pluginInfo.description}</p>
+            <div className="rounded-lg border bg-card overflow-hidden">
+              <div className="p-3 space-y-1.5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      {pluginInfo.icon && <span className="text-base">{pluginInfo.icon}</span>}
+                      <span className="text-xs font-medium">{pluginInfo.name}</span>
+                      <span className="text-[10px] text-muted-foreground">v{pluginInfo.version}</span>
+                      {pluginInfo.license && <span className="text-[10px] text-muted-foreground">{pluginInfo.license}</span>}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{pluginInfo.description}</p>
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                      <span>by {pluginInfo.author || "anonymous"}</span>
+                      <span>{pluginInfo.install_count} 安装</span>
+                      {pluginInfo.namespace && <span className="font-mono">{pluginInfo.namespace}</span>}
+                    </div>
+                  </div>
+                </div>
+                {/* Permissions summary */}
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <span>@grant: {pluginInfo.grant_perms || "none"}</span>
+                  <span>@match: {pluginInfo.match_types || "*"}</span>
+                  {pluginInfo.connect_domains && pluginInfo.connect_domains !== "*" && <span>@connect: {pluginInfo.connect_domains}</span>}
+                </div>
+                {pluginInfo.changelog && <p className="text-[10px] text-muted-foreground">更新: {pluginInfo.changelog}</p>}
               </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowPicker(true)}>更换</Button>
-                <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={() => { setPluginId(""); setPluginInfo(null); setScriptMode("manual"); }}>卸载</Button>
+              <div className="border-t px-3 py-1.5 flex items-center gap-2">
+                <a href={`/dashboard/webhook-plugins/debug?plugin=${pluginId}`} className="text-[10px] text-primary hover:underline">调试</a>
+                {pluginInfo.github_url && <a href={pluginInfo.github_url} target="_blank" rel="noopener" className="text-[10px] text-primary hover:underline">GitHub</a>}
+                <div className="ml-auto flex gap-1">
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowPicker(true)}>更换</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={() => { setPluginId(""); setPluginInfo(null); setScriptMode("manual"); }}>卸载</Button>
+                </div>
               </div>
             </div>
           ) : (
