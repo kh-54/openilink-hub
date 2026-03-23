@@ -80,6 +80,94 @@ func toDebugReplies(replies []string) []DebugReply {
 	return out
 }
 
+// createDebugVM creates a script VM with the same reply/skip/sandbox setup as runScript.
+func createDebugVM(script string, msg webhookPayload, req *reqData) (*goja.Runtime, *[]replyAction, *bool, error) {
+	grants, _, _ := parseScriptPerms(script)
+
+	vm := goja.New()
+	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+	vm.SetMaxCallStackSize(scriptMaxCallStack)
+	for _, name := range []string{"eval", "Function"} {
+		vm.GlobalObject().Delete(name)
+	}
+
+	ctx := map[string]any{"msg": msg}
+	if req != nil {
+		ctx["req"] = map[string]any{"url": req.URL, "method": req.Method, "headers": req.Headers, "body": req.Body}
+	}
+	vm.Set("ctx", ctx)
+
+	var replies []replyAction
+	skipped := false
+
+	canReply := grants["reply"] || (len(grants) == 0 && !grants["none"])
+	if canReply {
+		vm.Set("reply", func(call goja.FunctionCall) goja.Value {
+			if len(replies) >= scriptMaxReplies {
+				return goja.Undefined()
+			}
+			arg := call.Argument(0)
+			if arg == nil || goja.IsUndefined(arg) || goja.IsNull(arg) {
+				return goja.Undefined()
+			}
+			if s, ok := arg.Export().(string); ok {
+				if strings.HasPrefix(s, "data:") {
+					replies = append(replies, replyAction{Base64: s})
+				} else {
+					replies = append(replies, replyAction{Text: s})
+				}
+			} else if obj, ok := arg.Export().(map[string]any); ok {
+				if fwd, _ := obj["forward"].(bool); fwd {
+					replies = append(replies, replyAction{Forward: true})
+				} else if b64, _ := obj["base64"].(string); b64 != "" {
+					fn, _ := obj["filename"].(string)
+					replies = append(replies, replyAction{Base64: b64, Filename: fn})
+				}
+			}
+			return goja.Undefined()
+		})
+	} else {
+		vm.Set("reply", func(call goja.FunctionCall) goja.Value {
+			panic(vm.NewGoError(fmt.Errorf("reply() not granted")))
+		})
+	}
+	if grants["skip"] || (len(grants) == 0 && !grants["none"]) {
+		vm.Set("skip", func() { skipped = true })
+	} else {
+		vm.Set("skip", func() { panic(vm.NewGoError(fmt.Errorf("skip() not granted"))) })
+	}
+	if grants["none"] {
+		vm.Set("reply", func(call goja.FunctionCall) goja.Value { panic(vm.NewGoError(fmt.Errorf("blocked by @grant none"))) })
+		vm.Set("skip", func() { panic(vm.NewGoError(fmt.Errorf("blocked by @grant none"))) })
+	}
+
+	timer := time.AfterFunc(scriptTimeout, func() { vm.Interrupt("timeout") })
+	_, err := vm.RunString(script)
+	timer.Stop()
+	vm.ClearInterrupt()
+
+	return vm, &replies, &skipped, err
+}
+
+func replyActionsToDebug(replies []replyAction) []DebugReply {
+	var out []DebugReply
+	for _, r := range replies {
+		switch {
+		case r.Text != "":
+			out = append(out, DebugReply{Type: "text", Text: r.Text})
+		case r.Forward:
+			out = append(out, DebugReply{Type: "forward"})
+		case r.Base64 != "":
+			preview := r.Base64
+			if len(preview) > 80 {
+				preview = preview[:80] + "..."
+			}
+			out = append(out, DebugReply{Type: "base64", Base64: preview, Filename: r.Filename})
+		}
+	}
+	return out
+}
+
 // DebugRequest executes only the onRequest phase: parse + @match + onRequest.
 func DebugRequest(script string, mockMsg webhookPayload, webhookURL string) *DebugResult {
 	result := &DebugResult{Logs: []string{}, Replies: []DebugReply{}}
@@ -106,23 +194,34 @@ func DebugRequest(script string, mockMsg webhookPayload, webhookURL string) *Deb
 	}
 	req := &reqData{URL: webhookURL, Method: "POST", Headers: map[string]string{"Content-Type": "application/json"}, Body: string(body)}
 
-	// Run onRequest only (runScript also runs onResponse + HTTP, but we use a trick:
-	// we call the script phases manually)
-	vm, outReq, replies, skipped, err := runOnRequest(script, mockMsg, req)
-	_ = vm // keep for onResponse later
+	vm, repliesPtr, skippedPtr, err := createDebugVM(script, mockMsg, req)
 	if err != nil {
 		result.Error = err.Error()
 		result.Logs = append(result.Logs, "✕ 脚本错误: "+err.Error())
 		return result
 	}
+
+	// Run onRequest
+	if fn := vm.Get("onRequest"); fn != nil && !goja.IsUndefined(fn) {
+		if callable, ok := goja.AssertFunction(fn); ok {
+			if _, err := runScriptWithTimeout(vm, callable, vm.Get("ctx")); err != nil {
+				result.Error = err.Error()
+				result.Logs = append(result.Logs, "✕ onRequest 错误: "+err.Error())
+				return result
+			}
+		}
+	}
 	result.Logs = append(result.Logs, "✓ onRequest 执行完成")
-	result.Replies = toDebugReplies(replies)
+	result.Replies = replyActionsToDebug(*repliesPtr)
+	skipped := *skippedPtr
 	result.Skipped = skipped
 
 	if skipped {
 		result.Logs = append(result.Logs, "⚠ skip() 被调用")
 		return result
 	}
+
+	outReq := extractReqFromCtx(vm.Get("ctx").Export(), req)
 
 	if !connectDomains["*"] && outReq != nil && outReq.URL != req.URL {
 		if !isDomainAllowed(outReq.URL, connectDomains) {
@@ -143,26 +242,7 @@ func DebugRequest(script string, mockMsg webhookPayload, webhookURL string) *Deb
 func DebugResponse(script string, mockMsg webhookPayload, response *resData) *DebugResult {
 	result := &DebugResult{Logs: []string{}, Replies: []DebugReply{}}
 
-	vm := goja.New()
-	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
-	vm.SetMaxCallStackSize(scriptMaxCallStack)
-	for _, name := range []string{"eval", "Function"} {
-		vm.GlobalObject().Delete(name)
-	}
-
-	var replies []string
-	vm.Set("ctx", map[string]any{"msg": mockMsg})
-	vm.Set("reply", func(text string) {
-		if len(replies) < scriptMaxReplies {
-			replies = append(replies, text)
-		}
-	})
-	vm.Set("skip", func() {})
-
-	timer := time.AfterFunc(scriptTimeout, func() { vm.Interrupt("timeout") })
-	_, err := vm.RunString(script)
-	timer.Stop()
-	vm.ClearInterrupt()
+	vm, repliesPtr, _, err := createDebugVM(script, mockMsg, nil)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -171,11 +251,18 @@ func DebugResponse(script string, mockMsg webhookPayload, response *resData) *De
 	if fn := vm.Get("onResponse"); fn != nil && !goja.IsUndefined(fn) {
 		if callable, ok := goja.AssertFunction(fn); ok {
 			ctxObj := vm.Get("ctx").ToObject(vm)
-			ctxObj.Set("res", map[string]any{
-				"status":  response.Status,
-				"headers": response.Headers,
-				"body":    response.Body,
-			})
+			resObj := map[string]any{
+				"status":       response.Status,
+				"headers":      response.Headers,
+				"content_type": response.ContentType,
+				"size":         response.Size,
+			}
+			if response.RawBody != nil {
+				resObj["body"] = nil
+			} else {
+				resObj["body"] = response.Body
+			}
+			ctxObj.Set("res", resObj)
 			if _, err := runScriptWithTimeout(vm, callable, vm.Get("ctx")); err != nil {
 				result.Error = err.Error()
 				result.Logs = append(result.Logs, "✕ onResponse 错误: "+err.Error())
@@ -184,7 +271,8 @@ func DebugResponse(script string, mockMsg webhookPayload, response *resData) *De
 		}
 	}
 
-	result.Replies = toDebugReplies(replies)
+	replies := *repliesPtr
+	result.Replies = replyActionsToDebug(replies)
 	result.Logs = append(result.Logs, "✓ onResponse 执行完成")
 	if len(replies) > 0 {
 		result.Logs = append(result.Logs, fmt.Sprintf("✓ reply() 调用 %d 次", len(replies)))
@@ -192,64 +280,6 @@ func DebugResponse(script string, mockMsg webhookPayload, response *resData) *De
 	return result
 }
 
-// runOnRequest executes only the onRequest phase of a script.
-func runOnRequest(script string, msg webhookPayload, req *reqData) (*goja.Runtime, *reqData, []string, bool, error) {
-	grants, _, _ := parseScriptPerms(script)
-
-	vm := goja.New()
-	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
-	vm.SetMaxCallStackSize(scriptMaxCallStack)
-	for _, name := range []string{"eval", "Function"} {
-		vm.GlobalObject().Delete(name)
-	}
-
-	ctx := map[string]any{
-		"msg": msg,
-		"req": map[string]any{"url": req.URL, "method": req.Method, "headers": req.Headers, "body": req.Body},
-	}
-	vm.Set("ctx", ctx)
-
-	var replies []string
-	skipped := false
-
-	if grants["reply"] || (len(grants) == 0 && !grants["none"]) {
-		vm.Set("reply", func(text string) { if len(replies) < scriptMaxReplies { replies = append(replies, text) } })
-	} else {
-		vm.Set("reply", func(text string) { panic(vm.NewGoError(fmt.Errorf("reply() not granted"))) })
-	}
-	if grants["skip"] || (len(grants) == 0 && !grants["none"]) {
-		vm.Set("skip", func() { skipped = true })
-	} else {
-		vm.Set("skip", func() { panic(vm.NewGoError(fmt.Errorf("skip() not granted"))) })
-	}
-	if grants["none"] {
-		vm.Set("reply", func(text string) { panic(vm.NewGoError(fmt.Errorf("blocked by @grant none"))) })
-		vm.Set("skip", func() { panic(vm.NewGoError(fmt.Errorf("blocked by @grant none"))) })
-	}
-
-	timer := time.AfterFunc(scriptTimeout, func() { vm.Interrupt("timeout") })
-	_, err := vm.RunString(script)
-	timer.Stop()
-	vm.ClearInterrupt()
-	if err != nil {
-		return vm, nil, nil, false, err
-	}
-
-	if fn := vm.Get("onRequest"); fn != nil && !goja.IsUndefined(fn) {
-		if callable, ok := goja.AssertFunction(fn); ok {
-			if _, err := runScriptWithTimeout(vm, callable, vm.Get("ctx")); err != nil {
-				return vm, nil, nil, false, err
-			}
-		}
-	}
-
-	if skipped {
-		return vm, nil, replies, true, nil
-	}
-
-	outReq := extractReqFromCtx(vm.Get("ctx").Export(), req)
-	return vm, outReq, replies, false, nil
-}
 
 // MockPayload creates a test webhookPayload for debugging.
 func MockPayload(sender, content, msgType string) webhookPayload {
