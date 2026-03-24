@@ -72,7 +72,7 @@ export function Layout() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="OpenILink Hub">
-                <Link to="/dashboard">
+                <Link to="/">
                   <LayoutDashboard />
                   <span className="font-semibold tracking-tight">OpenILink Hub</span>
                 </Link>

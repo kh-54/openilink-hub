@@ -5,7 +5,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (res.status === 401) {
-    window.location.href = "/login";
+    const path = window.location.pathname;
+    const isPublic = path === "/" || path.startsWith("/webhook-plugins");
+    if (!isPublic) {
+      window.location.href = "/login";
+    }
     throw new Error("unauthorized");
   }
   const data = await res.json();

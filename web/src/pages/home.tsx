@@ -5,6 +5,7 @@ import { Card } from "../components/ui/card";
 import { HexagonBackground } from "../components/ui/hexagon-background";
 import { cn } from "../lib/utils";
 import { Bot, Puzzle, Webhook, Cable, Shield, Zap } from "lucide-react";
+import { api } from "../lib/api";
 
 const features = [
   { icon: Bot, title: "多 Bot 管理", desc: "同时管理多个微信 Bot，每个 Bot 独立运行、独立配置" },
@@ -17,6 +18,11 @@ const features = [
 
 export function HomePage() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    api.me().then(() => setLoggedIn(true)).catch(() => setLoggedIn(false));
+  }, []);
 
   useEffect(() => {
     const updateScrollState = () => {
@@ -55,9 +61,15 @@ export function HomePage() {
             <Link to="/webhook-plugins">
               <Button variant="ghost" size="sm" className="px-3 text-sm">插件市场</Button>
             </Link>
-            <Link to="/login">
-              <Button size="sm" className="px-3 text-sm">登录</Button>
-            </Link>
+            {loggedIn ? (
+              <Link to="/dashboard">
+                <Button size="sm" className="px-3 text-sm">进入控制台</Button>
+              </Link>
+            ) : (
+              <Link to="/login">
+                <Button size="sm" className="px-3 text-sm">登录</Button>
+              </Link>
+            )}
           </div>
         </div>
         <div
@@ -76,7 +88,7 @@ export function HomePage() {
             开源的微信 Bot 管理与消息中继平台。连接你的微信，通过 WebSocket、HTTP API 或 Webhook 接收和发送消息。
           </p>
           <div className="mt-8 flex justify-center gap-4 sm:mt-10">
-            <Link to="/login">
+            <Link to={loggedIn ? "/dashboard" : "/login"}>
               <Button size="lg" className="px-5 text-sm">开始使用</Button>
             </Link>
             <a href="https://github.com/openilink/openilink-hub" target="_blank" rel="noopener">
