@@ -75,7 +75,7 @@ export function HomePage() {
               : "border border-white/5 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] py-3 shadow-[0_10px_30px_rgba(0,0,0,0.16)] backdrop-blur-md",
           )}
         >
-          <span className="text-base font-semibold tracking-tight">OpenILink Hub</span>
+          <span className="text-base font-semibold tracking-tight">OpeniLink Hub</span>
           <div className="flex items-center gap-3">
             <Link to="/webhook-plugins">
               <Button variant="ghost" size="sm" className="px-3 text-sm">
@@ -108,7 +108,7 @@ export function HomePage() {
       <main className="relative z-10 flex-1 space-y-8 pb-20 sm:space-y-10 sm:pb-24">
         {/* Hero */}
         <section className="mx-auto max-w-3xl px-6 py-20 text-center sm:px-8 sm:py-24 lg:py-28">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">OpenILink Hub</h1>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">OpeniLink Hub</h1>
           <p className="mt-5 text-base leading-8 text-muted-foreground sm:text-lg">
             开源的微信 Bot 管理与消息中继平台。连接你的微信，通过 WebSocket、HTTP API 或 Webhook
             接收和发送消息。
@@ -192,7 +192,7 @@ export function HomePage() {
           rel="noopener"
           className="hover:text-primary"
         >
-          OpenILink Hub
+          OpeniLink Hub
         </a>
         {" · "}开源微信 Bot 管理平台
       </footer>

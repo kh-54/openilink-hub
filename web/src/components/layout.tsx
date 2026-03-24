@@ -86,10 +86,10 @@ export function Layout() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="OpenILink Hub">
+              <SidebarMenuButton asChild tooltip="OpeniLink Hub">
                 <Link to="/">
                   <LayoutDashboard />
-                  <span className="font-semibold tracking-tight">OpenILink Hub</span>
+                  <span className="font-semibold tracking-tight">OpeniLink Hub</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

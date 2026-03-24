@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebSocket test client for OpenILink Hub
+// WebSocket test client for OpeniLink Hub
 // Usage: node ws-test.mjs "ws://host:port/api/ws?key=API_KEY"
 // Requires: npm install ws (or Node >= 22 with built-in WebSocket)
 

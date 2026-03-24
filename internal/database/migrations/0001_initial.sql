@@ -1,4 +1,4 @@
--- OpenILink Hub schema v1 (consolidated)
+-- OpeniLink Hub schema v1 (consolidated)
 
 CREATE TABLE IF NOT EXISTS users (
     id            TEXT PRIMARY KEY,

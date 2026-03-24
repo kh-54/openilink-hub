@@ -250,7 +250,7 @@ export function PluginsPage({
           rel="noopener"
           className="hover:text-primary"
         >
-          OpenILink Hub
+          OpeniLink Hub
         </a>
         {" · "}Webhook 插件运行在安全沙箱中（5s 超时 · 禁止系统访问 · 管理员审核）
       </footer>

@@ -242,7 +242,7 @@ export function LoginPage() {
         <div className="flex flex-col gap-10">
           <div className="space-y-4 text-center">
             <p className="text-sm font-medium tracking-[0.18em] text-muted-foreground uppercase">
-              OpenILink Hub
+              OpeniLink Hub
             </p>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -258,7 +258,7 @@ export function LoginPage() {
 
           <Card className="rounded-[1.75rem] border-white/8 bg-card/82 backdrop-blur-sm">
             <CardHeader className="px-6 pt-8 pb-4 text-center sm:px-8">
-              <CardTitle className="text-2xl">OpenILink Hub</CardTitle>
+              <CardTitle className="text-2xl">OpeniLink Hub</CardTitle>
               <CardDescription>{mode === "login" ? "登录你的账号" : "创建新账号"}</CardDescription>
             </CardHeader>
             <CardContent className="px-6 pb-8 sm:px-8">
