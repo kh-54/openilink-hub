@@ -118,7 +118,7 @@ function MarketplaceTab() {
 function InstallModal({ app, onClose }: { app: any; onClose: () => void }) {
   const [bots, setBots] = useState<any[]>([]);
   const [botId, setBotId] = useState("");
-  const [handle, setHandle] = useState(app.slug || "");
+  const [handle, setHandle] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<{ handle: string; command?: string } | null>(null);
@@ -133,11 +133,10 @@ function InstallModal({ app, onClose }: { app: any; onClose: () => void }) {
 
   async function handleInstall() {
     if (!botId) { setError("请选择一个 Bot"); return; }
-    if (!handle.trim()) { setError("Handle 不能为空"); return; }
     setSaving(true);
     setError("");
     try {
-      await api.installApp(app.id, { bot_id: botId, handle: handle.trim() });
+      await api.installApp(app.id, { bot_id: botId, handle: handle.trim() || undefined });
       const firstCmd = app.commands?.[0];
       const cmdName = firstCmd ? (typeof firstCmd === "string" ? firstCmd : firstCmd.name) : undefined;
       setSuccess({ handle: handle.trim(), command: cmdName });
@@ -154,11 +153,11 @@ function InstallModal({ app, onClose }: { app: any; onClose: () => void }) {
           <>
             <p className="text-sm font-medium">安装成功！</p>
             <p className="text-xs text-muted-foreground">
-              发送 <code className="bg-secondary px-1 py-0.5 rounded">@{success.handle}</code>
-              {success.command && (
-                <> 或 <code className="bg-secondary px-1 py-0.5 rounded">/{success.command}</code></>
-              )}
-              {" "}测试
+              {success.handle && <>发送 <code className="bg-secondary px-1 py-0.5 rounded">@{success.handle}</code></>}
+              {success.handle && success.command && " 或 "}
+              {success.command && <>发送 <code className="bg-secondary px-1 py-0.5 rounded">{success.command}</code></>}
+              {!success.handle && !success.command && "App 已安装"}
+              {(success.handle || success.command) && " 测试"}
             </p>
             <div className="flex justify-end">
               <Button size="sm" onClick={onClose}>确认</Button>
@@ -201,10 +200,10 @@ function InstallModal({ app, onClose }: { app: any; onClose: () => void }) {
               </select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Handle（@提及名称）</label>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Handle（可选，用于 @提及）</label>
               <Input
-                placeholder={app.slug || "handle"}
+                placeholder="留空则只能通过 /command 触发"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value)}
                 className="h-8 text-xs font-mono"

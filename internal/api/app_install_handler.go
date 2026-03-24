@@ -32,11 +32,7 @@ func (s *Server) handleInstallApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default handle to app slug
 	handle := req.Handle
-	if handle == "" {
-		handle = app.Slug
-	}
 
 	// Verify user owns the bot
 	bot, err := s.DB.GetBot(req.BotID)
@@ -45,11 +41,13 @@ func (s *Server) handleInstallApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check handle uniqueness on this bot
-	existing, _ := s.DB.GetInstallationByHandle(req.BotID, handle)
-	if existing != nil {
-		jsonError(w, "handle @"+handle+" already in use on this bot", http.StatusConflict)
-		return
+	// Check handle uniqueness on this bot (only if handle is set)
+	if handle != "" {
+		existing, _ := s.DB.GetInstallationByHandle(req.BotID, handle)
+		if existing != nil {
+			jsonError(w, "handle @"+handle+" already in use on this bot", http.StatusConflict)
+			return
+		}
 	}
 
 	inst, err := s.DB.InstallApp(app.ID, req.BotID)
