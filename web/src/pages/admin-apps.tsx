@@ -31,6 +31,16 @@ export function AdminAppsTab() {
     try { await api.deleteApp(app.id); setSelected(null); load(); } catch (err: any) { setError(err.message); }
   }
 
+  async function handleApprove(app: any) {
+    try { await api.reviewListing(app.id, true); load(); } catch (err: any) { setError(err.message); }
+  }
+
+  async function handleReject(app: any) {
+    const reason = prompt("拒绝原因：");
+    if (!reason) return;
+    try { await api.reviewListing(app.id, false, reason); load(); } catch (err: any) { setError(err.message); }
+  }
+
   return (
     <div className="space-y-3">
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -47,6 +57,8 @@ export function AdminAppsTab() {
                   <span className="text-xs font-medium">{app.name}</span>
                   <span className="text-xs text-muted-foreground font-mono">{app.slug}</span>
                   {app.listed && <Badge variant="default" className="text-[10px]">已上架</Badge>}
+                  {app.listing_status === "pending" && <Badge variant="outline" className="text-[10px] text-orange-500 border-orange-500">待审核</Badge>}
+                  {app.listing_status === "rejected" && <Badge variant="destructive" className="text-[10px]">已拒绝</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {app.owner_name && `by ${app.owner_name} · `}
@@ -54,10 +66,20 @@ export function AdminAppsTab() {
                 </p>
               </div>
             </div>
-            <button onClick={(e) => toggleListed(e, app)}
-              className={`text-xs px-2 py-0.5 rounded cursor-pointer ${app.listed ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
-              {app.listed ? "下架" : "上架"}
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {app.listing_status === "pending" && (
+                <>
+                  <button onClick={(e) => { e.stopPropagation(); handleApprove(app); }}
+                    className="text-xs px-2 py-0.5 rounded cursor-pointer bg-primary/10 text-primary">通过</button>
+                  <button onClick={(e) => { e.stopPropagation(); handleReject(app); }}
+                    className="text-xs px-2 py-0.5 rounded cursor-pointer bg-destructive/10 text-destructive">拒绝</button>
+                </>
+              )}
+              <button onClick={(e) => toggleListed(e, app)}
+                className={`text-xs px-2 py-0.5 rounded cursor-pointer ${app.listed ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                {app.listed ? "下架" : "上架"}
+              </button>
+            </div>
           </div>
         ))}
       </div>

@@ -25,10 +25,12 @@ type App struct {
 	SetupURL    string          `json:"setup_url,omitempty"`
 	RedirectURL string          `json:"redirect_url,omitempty"`
 	ClientSecret string         `json:"client_secret,omitempty"`
-	Listed      bool            `json:"listed"`
-	Status      string          `json:"status"`
-	CreatedAt   int64           `json:"created_at"`
-	UpdatedAt   int64           `json:"updated_at"`
+	Listed             bool   `json:"listed"`
+	ListingStatus      string `json:"listing_status,omitempty"`       // pending / rejected / ""
+	ListingRejectReason string `json:"listing_reject_reason,omitempty"`
+	Status             string `json:"status"`
+	CreatedAt          int64  `json:"created_at"`
+	UpdatedAt          int64  `json:"updated_at"`
 
 	// Joined
 	OwnerName string `json:"owner_name,omitempty"`
@@ -87,11 +89,11 @@ func (db *DB) CreateApp(app *App) (*App, error) {
 	if app.ClientSecret == "" {
 		app.ClientSecret = generateToken(32)
 	}
-	err := db.QueryRow(`INSERT INTO apps (id, owner_id, name, slug, description, icon, icon_url, homepage, tools, events, scopes, setup_url, redirect_url, client_secret, listed)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+	err := db.QueryRow(`INSERT INTO apps (id, owner_id, name, slug, description, icon, icon_url, homepage, tools, events, scopes, setup_url, redirect_url, client_secret, listed, listing_status, listing_reject_reason)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING EXTRACT(EPOCH FROM created_at)::BIGINT, EXTRACT(EPOCH FROM updated_at)::BIGINT`,
 		app.ID, app.OwnerID, app.Name, app.Slug, app.Description, app.Icon, app.IconURL, app.Homepage,
-		app.Tools, app.Events, app.Scopes, app.SetupURL, app.RedirectURL, app.ClientSecret, app.Listed,
+		app.Tools, app.Events, app.Scopes, app.SetupURL, app.RedirectURL, app.ClientSecret, app.Listed, "", "",
 	).Scan(&app.CreatedAt, &app.UpdatedAt)
 	app.Status = "active"
 	return app, err
@@ -101,13 +103,13 @@ func (db *DB) CreateApp(app *App) (*App, error) {
 func (db *DB) GetApp(id string) (*App, error) {
 	a := &App{}
 	err := db.QueryRow(`SELECT a.id, a.owner_id, a.name, a.slug, a.description, a.icon, a.icon_url, a.homepage,
-		a.tools, a.events, a.scopes, a.setup_url, a.redirect_url, a.client_secret, a.listed, a.status,
+		a.tools, a.events, a.scopes, a.setup_url, a.redirect_url, a.client_secret, a.listed, a.listing_status, a.listing_reject_reason, a.status,
 		EXTRACT(EPOCH FROM a.created_at)::BIGINT, EXTRACT(EPOCH FROM a.updated_at)::BIGINT,
 		COALESCE(u.username, '')
 		FROM apps a LEFT JOIN users u ON u.id = a.owner_id
 		WHERE a.id = $1`, id).Scan(
 		&a.ID, &a.OwnerID, &a.Name, &a.Slug, &a.Description, &a.Icon, &a.IconURL, &a.Homepage,
-		&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.Status,
+		&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.ListingStatus, &a.ListingRejectReason, &a.Status,
 		&a.CreatedAt, &a.UpdatedAt, &a.OwnerName)
 	if err != nil {
 		return nil, err
@@ -119,11 +121,11 @@ func (db *DB) GetApp(id string) (*App, error) {
 func (db *DB) GetAppBySlug(slug string) (*App, error) {
 	a := &App{}
 	err := db.QueryRow(`SELECT id, owner_id, name, slug, description, icon, icon_url, homepage,
-		tools, events, scopes, setup_url, redirect_url, client_secret, listed, status,
+		tools, events, scopes, setup_url, redirect_url, client_secret, listed, listing_status, listing_reject_reason, status,
 		EXTRACT(EPOCH FROM created_at)::BIGINT, EXTRACT(EPOCH FROM updated_at)::BIGINT
 		FROM apps WHERE slug = $1`, slug).Scan(
 		&a.ID, &a.OwnerID, &a.Name, &a.Slug, &a.Description, &a.Icon, &a.IconURL, &a.Homepage,
-		&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.Status,
+		&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.ListingStatus, &a.ListingRejectReason, &a.Status,
 		&a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -134,7 +136,7 @@ func (db *DB) GetAppBySlug(slug string) (*App, error) {
 // ListAppsByOwner returns all apps owned by a user.
 func (db *DB) ListAppsByOwner(ownerID string) ([]App, error) {
 	rows, err := db.Query(`SELECT id, owner_id, name, slug, description, icon, icon_url, homepage,
-		tools, events, scopes, setup_url, redirect_url, client_secret, listed, status,
+		tools, events, scopes, setup_url, redirect_url, client_secret, listed, listing_status, listing_reject_reason, status,
 		EXTRACT(EPOCH FROM created_at)::BIGINT, EXTRACT(EPOCH FROM updated_at)::BIGINT
 		FROM apps WHERE owner_id = $1 ORDER BY created_at DESC`, ownerID)
 	if err != nil {
@@ -145,7 +147,7 @@ func (db *DB) ListAppsByOwner(ownerID string) ([]App, error) {
 	for rows.Next() {
 		var a App
 		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.Slug, &a.Description, &a.Icon, &a.IconURL, &a.Homepage,
-			&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.Status,
+			&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.ListingStatus, &a.ListingRejectReason, &a.Status,
 			&a.CreatedAt, &a.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -157,7 +159,7 @@ func (db *DB) ListAppsByOwner(ownerID string) ([]App, error) {
 // ListListedApps returns all publicly listed apps.
 func (db *DB) ListListedApps() ([]App, error) {
 	rows, err := db.Query(`SELECT a.id, a.owner_id, a.name, a.slug, a.description, a.icon, a.icon_url, a.homepage,
-		a.tools, a.events, a.scopes, a.setup_url, a.redirect_url, '', a.listed, a.status,
+		a.tools, a.events, a.scopes, a.setup_url, a.redirect_url, '', a.listed, a.listing_status, a.listing_reject_reason, a.status,
 		EXTRACT(EPOCH FROM a.created_at)::BIGINT, EXTRACT(EPOCH FROM a.updated_at)::BIGINT,
 		COALESCE(u.username, '')
 		FROM apps a LEFT JOIN users u ON u.id = a.owner_id
@@ -170,7 +172,7 @@ func (db *DB) ListListedApps() ([]App, error) {
 	for rows.Next() {
 		var a App
 		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.Slug, &a.Description, &a.Icon, &a.IconURL, &a.Homepage,
-			&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.Status,
+			&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.ListingStatus, &a.ListingRejectReason, &a.Status,
 			&a.CreatedAt, &a.UpdatedAt, &a.OwnerName); err != nil {
 			return nil, err
 		}
@@ -182,7 +184,7 @@ func (db *DB) ListListedApps() ([]App, error) {
 // ListAllApps returns all apps (admin only).
 func (db *DB) ListAllApps() ([]App, error) {
 	rows, err := db.Query(`SELECT a.id, a.owner_id, a.name, a.slug, a.description, a.icon, a.icon_url, a.homepage,
-		a.tools, a.events, a.scopes, a.setup_url, a.redirect_url, '', a.listed, a.status,
+		a.tools, a.events, a.scopes, a.setup_url, a.redirect_url, '', a.listed, a.listing_status, a.listing_reject_reason, a.status,
 		EXTRACT(EPOCH FROM a.created_at)::BIGINT, EXTRACT(EPOCH FROM a.updated_at)::BIGINT,
 		COALESCE(u.username, '')
 		FROM apps a LEFT JOIN users u ON u.id = a.owner_id
@@ -195,7 +197,7 @@ func (db *DB) ListAllApps() ([]App, error) {
 	for rows.Next() {
 		var a App
 		if err := rows.Scan(&a.ID, &a.OwnerID, &a.Name, &a.Slug, &a.Description, &a.Icon, &a.IconURL, &a.Homepage,
-			&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.Status,
+			&a.Tools, &a.Events, &a.Scopes, &a.SetupURL, &a.RedirectURL, &a.ClientSecret, &a.Listed, &a.ListingStatus, &a.ListingRejectReason, &a.Status,
 			&a.CreatedAt, &a.UpdatedAt, &a.OwnerName); err != nil {
 			return nil, err
 		}
@@ -378,4 +380,20 @@ func (db *DB) ExchangeOAuthCode(code string) (appID, botID string, err error) {
 // CleanExpiredOAuthCodes removes expired codes.
 func (db *DB) CleanExpiredOAuthCodes() {
 	db.Exec("DELETE FROM app_oauth_codes WHERE expires_at < NOW()")
+}
+
+// RequestListing sets listing_status to "pending".
+func (db *DB) RequestListing(id string) error {
+	_, err := db.Exec("UPDATE apps SET listing_status='pending', updated_at=NOW() WHERE id=$1", id)
+	return err
+}
+
+// ReviewListing approves or rejects a listing request.
+func (db *DB) ReviewListing(id string, approve bool, reason string) error {
+	if approve {
+		_, err := db.Exec("UPDATE apps SET listed=TRUE, listing_status='', listing_reject_reason='', updated_at=NOW() WHERE id=$1", id)
+		return err
+	}
+	_, err := db.Exec("UPDATE apps SET listing_status='rejected', listing_reject_reason=$1, updated_at=NOW() WHERE id=$2", reason, id)
+	return err
 }

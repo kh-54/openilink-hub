@@ -71,7 +71,30 @@ export function AppDetailPage() {
         <Badge variant={app.status === "active" ? "default" : "outline"}>
           {app.status === "active" ? "启用" : app.status || "草稿"}
         </Badge>
+        {app.listed ? (
+          <Badge variant="default">已上架</Badge>
+        ) : app.listing_status === "pending" ? (
+          <Badge variant="outline">审核中</Badge>
+        ) : app.listing_status === "rejected" ? (
+          <Badge variant="destructive">已拒绝</Badge>
+        ) : null}
       </div>
+
+      {/* Listing status */}
+      {!app.listed && app.listing_status !== "pending" && (
+        <ListingSection app={app} onUpdate={loadApp} />
+      )}
+      {app.listing_status === "pending" && (
+        <Card className="bg-primary/5 border-primary/20">
+          <p className="text-xs">上架申请已提交，等待管理员审核。</p>
+        </Card>
+      )}
+      {app.listing_status === "rejected" && app.listing_reject_reason && (
+        <Card className="bg-destructive/5 border-destructive/20 space-y-2">
+          <p className="text-xs text-destructive">上架被拒绝：{app.listing_reject_reason}</p>
+          <Button size="sm" variant="outline" onClick={async () => { await api.requestListing(app.id); loadApp(); }}>重新申请</Button>
+        </Card>
+      )}
 
       {/* Tabs */}
       <div className="flex rounded-lg border overflow-hidden w-fit">
@@ -473,5 +496,22 @@ function InstallationsTab({ appId }: { appId: string }) {
         <p className="text-center text-sm text-muted-foreground py-4">暂无安装</p>
       )}
     </div>
+  );
+}
+
+function ListingSection({ app, onUpdate }: { app: any; onUpdate: () => void }) {
+  const [loading, setLoading] = useState(false);
+  return (
+    <Card className="flex items-center justify-between">
+      <div>
+        <p className="text-xs font-medium">上架到 App 市场</p>
+        <p className="text-[10px] text-muted-foreground">上架后其他用户可以搜索并安装你的 App</p>
+      </div>
+      <Button size="sm" variant="outline" disabled={loading} onClick={async () => {
+        setLoading(true);
+        try { await api.requestListing(app.id); onUpdate(); } catch {}
+        setLoading(false);
+      }}>{loading ? "..." : "申请上架"}</Button>
+    </Card>
   );
 }

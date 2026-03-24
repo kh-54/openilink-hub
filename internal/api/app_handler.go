@@ -231,6 +231,49 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w)
 }
 
+// POST /api/apps/{id}/request-listing — owner requests to list their app
+func (s *Server) handleRequestListing(w http.ResponseWriter, r *http.Request) {
+	app := s.requireApp(w, r)
+	if app == nil {
+		return
+	}
+	if app.Listed {
+		jsonError(w, "already listed", http.StatusBadRequest)
+		return
+	}
+	if app.ListingStatus == "pending" {
+		jsonError(w, "already pending review", http.StatusBadRequest)
+		return
+	}
+	if err := s.DB.RequestListing(app.ID); err != nil {
+		jsonError(w, "request failed", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w)
+}
+
+// PUT /api/admin/apps/{id}/review-listing — admin approves/rejects listing
+func (s *Server) handleReviewListing(w http.ResponseWriter, r *http.Request) {
+	appID := r.PathValue("id")
+	var req struct {
+		Approve bool   `json:"approve"`
+		Reason  string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if !req.Approve && req.Reason == "" {
+		jsonError(w, "reason required for rejection", http.StatusBadRequest)
+		return
+	}
+	if err := s.DB.ReviewListing(appID, req.Approve, req.Reason); err != nil {
+		jsonError(w, "review failed", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w)
+}
+
 // GET /api/admin/apps — list all apps (admin only)
 func (s *Server) handleAdminListApps(w http.ResponseWriter, r *http.Request) {
 	apps, err := s.DB.ListAllApps()

@@ -187,6 +187,15 @@ export const api = {
   listApiLogs: (appId: string, iid: string, limit = 50) =>
     request<any[]>(`/api/apps/${appId}/installations/${iid}/api-logs?limit=${limit}`),
 
+  // Listing
+  requestListing: (appId: string) =>
+    request(`/api/apps/${appId}/request-listing`, { method: "POST" }),
+  reviewListing: (appId: string, approve: boolean, reason?: string) =>
+    request(`/api/admin/apps/${appId}/review-listing`, {
+      method: "PUT",
+      body: JSON.stringify({ approve, reason: reason || "" }),
+    }),
+
   // Webhook logs
   webhookLogs: (botId: string, channelId?: string, limit = 50) =>
     request<any[]>(

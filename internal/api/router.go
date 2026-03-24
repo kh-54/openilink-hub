@@ -149,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("PUT /api/apps/{id}", s.handleUpdateApp)
 	protected.HandleFunc("DELETE /api/apps/{id}", s.handleDeleteApp)
 	protected.HandleFunc("POST /api/apps/{id}/install", s.handleInstallApp)
+	protected.HandleFunc("POST /api/apps/{id}/request-listing", s.handleRequestListing)
 	protected.HandleFunc("GET /api/apps/{id}/installations", s.handleListInstallations)
 	protected.HandleFunc("GET /api/apps/{id}/installations/{iid}", s.handleGetInstallation)
 	protected.HandleFunc("PUT /api/apps/{id}/installations/{iid}", s.handleUpdateInstallation)
@@ -180,6 +181,7 @@ func (s *Server) Handler() http.Handler {
 	// --- Admin: apps ---
 	protected.HandleFunc("GET /api/admin/apps", s.requireAdmin(s.handleAdminListApps))
 	protected.HandleFunc("PUT /api/admin/apps/{id}/listed", s.requireAdmin(s.handleSetAppListed))
+	protected.HandleFunc("PUT /api/admin/apps/{id}/review-listing", s.requireAdmin(s.handleReviewListing))
 
 	// --- Admin: system config ---
 	protected.HandleFunc("GET /api/admin/config/oauth", s.requireAdmin(s.handleGetOAuthConfig))
