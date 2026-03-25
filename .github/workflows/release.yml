@@ -10,6 +10,9 @@ permissions:
   contents: write
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # --- Build frontend (shared) ---
   frontend:
@@ -87,11 +90,16 @@ jobs:
           path: darwin-archives/
           merge-multiple: true
 
+      # Mark downloaded artifacts as not dirty
+      - name: Exclude artifacts from git dirty check
+        run: |
+          echo "internal/web/dist/" >> .gitignore
+          echo "darwin-archives/" >> .gitignore
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      # Cross-compilation toolchains for linux/arm64 and windows
       - name: Install cross-compilation toolchains
         run: |
           sudo apt-get update
