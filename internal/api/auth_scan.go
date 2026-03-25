@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -43,28 +42,48 @@ func (s *Server) handleScanLoginStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// SSE stream
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	flusher, _ := w.(http.Flusher)
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("ws upgrade failed", "err", err)
+		return
+	}
+	defer ws.Close()
+
+	// Read pump: detect client disconnect
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			if _, _, err := ws.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
 
 	sendEvent := func(event, data string) {
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
-		if flusher != nil {
-			flusher.Flush()
+		var parsed json.RawMessage
+		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
+			parsed, _ = json.Marshal(data)
 		}
+		msg := map[string]any{"event": event}
+		// Merge parsed data fields into the message
+		var fields map[string]any
+		if json.Unmarshal(parsed, &fields) == nil {
+			for k, v := range fields {
+				msg[k] = v
+			}
+		}
+		ws.WriteJSON(msg)
 	}
 
-	ctx := r.Context()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return
 		default:
 		}
 
-		result, err := ilinkProvider.PollBind(ctx, sessionID)
+		result, err := ilinkProvider.PollBind(context.Background(), sessionID)
 		if err != nil {
 			sendEvent("error", `{"message":"poll failed"}`)
 			return
@@ -79,20 +98,20 @@ func (s *Server) handleScanLoginStatus(w http.ResponseWriter, r *http.Request) {
 			j, _ := json.Marshal(map[string]string{"status": "refreshed", "qr_url": result.QRURL})
 			sendEvent("status", string(j))
 		case "confirmed":
-			s.completeScanLogin(w, r, result, sendEvent)
+			s.completeScanLogin(result, sendEvent)
 			return
 		}
 	}
 }
 
 // completeScanLogin handles the "confirmed" state: resolve user via bots table,
-// bind the bot, and set a session cookie.
+// bind the bot, and create a session token.
 //
 // User resolution order:
 //  1. bot_id match → existing bot's user_id (rebind)
 //  2. ilink_user_id match → another bot from same iLink user → that user_id
 //  3. No match → auto-create a new Hub user
-func (s *Server) completeScanLogin(w http.ResponseWriter, r *http.Request, result *provider.BindPollResult, sendEvent func(string, string)) {
+func (s *Server) completeScanLogin(result *provider.BindPollResult, sendEvent func(string, string)) {
 	var creds struct {
 		BotID       string `json:"bot_id"`
 		ILinkUserID string `json:"ilink_user_id"`
@@ -171,10 +190,9 @@ func (s *Server) completeScanLogin(w http.ResponseWriter, r *http.Request, resul
 
 	s.BotManager.StartBot(context.Background(), bot)
 
-	// Login: create session
+	// Login: create session — send token via WS (can't set cookie on WS)
 	sessionToken, _ := auth.CreateSession(s.DB, user.ID)
-	setSessionCookie(w, sessionToken)
 
-	j, _ := json.Marshal(map[string]string{"status": "connected", "bot_id": bot.ID})
+	j, _ := json.Marshal(map[string]string{"status": "connected", "bot_id": bot.ID, "session_token": sessionToken})
 	sendEvent("status", string(j))
 }

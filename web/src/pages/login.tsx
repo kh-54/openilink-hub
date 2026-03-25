@@ -80,39 +80,39 @@ export function LoginPage() {
       setScanStatus("wait");
       setScanMessage("请使用微信扫描二维码");
 
-      const es = new EventSource(`/api/auth/scan/status/${data.session_id}`);
-      es.addEventListener("status", (e) => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/auth/scan/status/${data.session_id}`);
+      ws.onmessage = (e) => {
         const d = JSON.parse(e.data);
-        if (d.status === "wait") {
-          // keep waiting
-        } else if (d.status === "scanned") {
-          setScanStatus("scanned");
-          setScanMessage("已扫码，请在手机上确认...");
-        } else if (d.status === "refreshed") {
-          setQrUrl(d.qr_url);
-          setScanStatus("wait");
-          setScanMessage("二维码已刷新，请重新扫描");
-        } else if (d.status === "connected") {
-          es.close();
-          navigate("/dashboard");
-        }
-      });
-      es.addEventListener("error", (e) => {
-        // Check if it's a real error event with data
-        try {
-          const d = JSON.parse((e as MessageEvent).data);
+        if (d.event === "status") {
+          if (d.status === "wait") {
+            // keep waiting
+          } else if (d.status === "scanned") {
+            setScanStatus("scanned");
+            setScanMessage("已扫码，请在手机上确认...");
+          } else if (d.status === "refreshed") {
+            setQrUrl(d.qr_url);
+            setScanStatus("wait");
+            setScanMessage("二维码已刷新，请重新扫描");
+          } else if (d.status === "connected") {
+            if (d.session_token) {
+              document.cookie = `session=${d.session_token}; path=/; max-age=${7*24*3600}; samesite=lax`;
+            }
+            ws.close();
+            navigate("/dashboard");
+          }
+        } else if (d.event === "error") {
           setScanMessage(d.message || "扫码登录失败");
-        } catch {
-          setScanMessage("连接中断，请刷新重试");
+          setScanStatus("error");
+          ws.close();
         }
-        setScanStatus("error");
-        es.close();
-      });
-      es.onerror = () => {
+      };
+      ws.onerror = () => {
         setScanStatus("error");
         setScanMessage("连接中断，请刷新重试");
-        es.close();
+        ws.close();
       };
+      ws.onclose = () => {};
     } catch (err: any) {
       setScanStatus("error");
       setScanMessage(err.message || "初始化失败");

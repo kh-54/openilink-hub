@@ -88,6 +88,7 @@ func (s *Server) handleBindStart(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.PathValue("sessionID")
+	enableAI := r.URL.Query().Get("enable_ai") == "true"
 
 	ilinkProvider.PendingBinds.Lock()
 	entry, ok := ilinkProvider.PendingBinds.M[sessionID]
@@ -97,28 +98,47 @@ func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// SSE
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	flusher, _ := w.(http.Flusher)
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("ws upgrade failed", "err", err)
+		return
+	}
+	defer ws.Close()
+
+	// Read pump: detect client disconnect
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			if _, _, err := ws.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
 
 	sendEvent := func(event, data string) {
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
-		if flusher != nil {
-			flusher.Flush()
+		var parsed json.RawMessage
+		if err := json.Unmarshal([]byte(data), &parsed); err != nil {
+			parsed, _ = json.Marshal(data)
 		}
+		msg := map[string]any{"event": event}
+		var fields map[string]any
+		if json.Unmarshal(parsed, &fields) == nil {
+			for k, v := range fields {
+				msg[k] = v
+			}
+		}
+		ws.WriteJSON(msg)
 	}
 
-	ctx := r.Context()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return
 		default:
 		}
 
-		result, err := ilinkProvider.PollBind(ctx, sessionID)
+		result, err := ilinkProvider.PollBind(context.Background(), sessionID)
 		if err != nil {
 			sendEvent("error", `{"message":"poll failed"}`)
 			return
@@ -170,7 +190,7 @@ func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 				}
 				// Auto-create default channel for new bots only
 				var aiCfg *database.AIConfig
-				if r.URL.Query().Get("enable_ai") == "true" {
+				if enableAI {
 					aiCfg = &database.AIConfig{Enabled: true, Source: "builtin"}
 				}
 				s.DB.CreateChannel(bot.ID, "默认", "", nil, aiCfg)

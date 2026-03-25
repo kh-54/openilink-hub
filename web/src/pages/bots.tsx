@@ -79,19 +79,23 @@ export function BotsPage() {
       const { session_id, qr_url } = await api.bindStart();
       setQrUrl(qr_url);
       setBindStatus("请使用手机微信扫描上方二维码");
-      const es = new EventSource(`/api/bots/bind/status/${session_id}${enableAI ? "?enable_ai=true" : ""}`);
-      es.addEventListener("status", (e) => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/bots/bind/status/${session_id}${enableAI ? "?enable_ai=true" : ""}`);
+      ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
-        if (data.status === "scanned") setBindStatus("已扫码，请在手机上点击确认...");
-        if (data.status === "refreshed") { setQrUrl(data.qr_url); setBindStatus("二维码已刷新"); }
-        if (data.status === "connected") {
-          toast({ title: "绑定成功", description: "微信账号已添加。" });
-          es.close();
-          setBinding(false);
-          load();
+        if (data.event === "status") {
+          if (data.status === "scanned") setBindStatus("已扫码，请在手机上点击确认...");
+          if (data.status === "refreshed") { setQrUrl(data.qr_url); setBindStatus("二维码已刷新"); }
+          if (data.status === "connected") {
+            toast({ title: "绑定成功", description: "微信账号已添加。" });
+            ws.close();
+            setBinding(false);
+            load();
+          }
         }
-      });
-      es.onerror = () => { setBindStatus("同步中断，请重试"); es.close(); };
+      };
+      ws.onerror = () => { setBindStatus("同步中断，请重试"); ws.close(); };
+      ws.onclose = () => {};
     } catch (err: any) {
       setBindStatus("初始化失败: " + err.message);
     }
