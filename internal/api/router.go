@@ -58,6 +58,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/oauth/{provider}", s.handleOAuthRedirect)
 	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", s.handleOAuthCallback)
 
+	// --- iLink scan login: scan QR to register + login + bind bot ---
+	mux.HandleFunc("POST /api/auth/scan/start", s.handleScanLoginStart)
+	mux.HandleFunc("GET /api/auth/scan/status/{sessionID}", s.handleScanLoginStatus)
+
 	// --- Public info ---
 	mux.HandleFunc("GET /api/info", s.handleInfo)
 

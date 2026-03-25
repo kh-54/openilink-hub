@@ -220,7 +220,7 @@ func (e *testEnv) userID() string {
 func (e *testEnv) createBotForUser(name string) *database.Bot {
 	e.t.Helper()
 	uid := e.userID()
-	b, err := e.db.CreateBot(uid, name, "mock", mockProvider.Credentials())
+	b, err := e.db.CreateBot(uid, name, "mock", "", mockProvider.Credentials())
 	if err != nil {
 		e.t.Fatalf("createBot: %v", err)
 	}
@@ -2139,7 +2139,7 @@ func TestMediaStorageAndProxy(t *testing.T) {
 	userID := me["id"].(string)
 
 	// Create bot
-	botObj, _ := db.CreateBot(userID, "MediaBot", "mock", mockProvider.Credentials())
+	botObj, _ := db.CreateBot(userID, "MediaBot", "mock", "", mockProvider.Credentials())
 	mgr.StartBot(context.Background(), botObj)
 	ch, _ := db.CreateChannel(botObj.ID, "MediaChan", "", nil, nil)
 

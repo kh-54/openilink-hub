@@ -68,7 +68,7 @@ func TestBotCRUD(t *testing.T) {
 	cleanupUser(t, db, user.ID)
 
 	creds, _ := json.Marshal(map[string]string{"bot_id": "ilink-bot-123", "bot_token": "token-abc"})
-	bot, err := db.CreateBot(user.ID, "MyBot", "ilink", creds)
+	bot, err := db.CreateBot(user.ID, "MyBot", "ilink", "ilink-bot-123", creds)
 	if err != nil {
 		t.Fatalf("create bot: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestChannelWithFilter(t *testing.T) {
 	cleanupUser(t, db, user.ID)
 
 	creds, _ := json.Marshal(map[string]string{"mock": "true"})
-	bot, _ := db.CreateBot(user.ID, "", "mock", creds)
+	bot, _ := db.CreateBot(user.ID, "", "mock", "", creds)
 
 	filter := &FilterRule{
 		UserIDs:  []string{"user-a", "user-b"},
@@ -155,7 +155,7 @@ func TestMessageCRUD(t *testing.T) {
 	cleanupUser(t, db, user.ID)
 
 	creds, _ := json.Marshal(map[string]string{"mock": "true"})
-	bot, _ := db.CreateBot(user.ID, "", "mock", creds)
+	bot, _ := db.CreateBot(user.ID, "", "mock", "", creds)
 
 	itemList, _ := json.Marshal([]map[string]any{{"type": "text", "text": "hello"}})
 	for i := 0; i < 5; i++ {

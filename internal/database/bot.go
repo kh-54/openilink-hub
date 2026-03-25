@@ -12,6 +12,7 @@ type Bot struct {
 	UserID         string          `json:"user_id"`
 	Name           string          `json:"name"`
 	Provider       string          `json:"provider"`
+	ProviderID     string          `json:"provider_id,omitempty"` // provider-specific bot ID (e.g. iLink bot_id)
 	Status         string          `json:"status"`
 	Credentials    json.RawMessage `json:"credentials,omitempty"`
 	SyncState      json.RawMessage `json:"-"`
@@ -23,14 +24,14 @@ type Bot struct {
 	UpdatedAt      int64           `json:"updated_at"`
 }
 
-const botSelectCols = `id, user_id, name, provider, status, credentials, sync_state,
+const botSelectCols = `id, user_id, name, provider, provider_id, status, credentials, sync_state,
 	msg_count, EXTRACT(EPOCH FROM last_msg_at)::BIGINT,
 	reminder_hours, EXTRACT(EPOCH FROM last_reminded_at)::BIGINT,
 	EXTRACT(EPOCH FROM created_at)::BIGINT, EXTRACT(EPOCH FROM updated_at)::BIGINT`
 
 func scanBot(scanner interface{ Scan(...any) error }) (*Bot, error) {
 	b := &Bot{}
-	err := scanner.Scan(&b.ID, &b.UserID, &b.Name, &b.Provider, &b.Status,
+	err := scanner.Scan(&b.ID, &b.UserID, &b.Name, &b.Provider, &b.ProviderID, &b.Status,
 		&b.Credentials, &b.SyncState, &b.MsgCount, &b.LastMsgAt,
 		&b.ReminderHours, &b.LastRemindedAt,
 		&b.CreatedAt, &b.UpdatedAt)
@@ -40,7 +41,7 @@ func scanBot(scanner interface{ Scan(...any) error }) (*Bot, error) {
 	return b, nil
 }
 
-func (db *DB) CreateBot(userID, name, provider string, credentials json.RawMessage) (*Bot, error) {
+func (db *DB) CreateBot(userID, name, provider, providerID string, credentials json.RawMessage) (*Bot, error) {
 	id := uuid.New().String()
 	if name == "" {
 		name = "Bot-" + id[:8]
@@ -49,15 +50,15 @@ func (db *DB) CreateBot(userID, name, provider string, credentials json.RawMessa
 		credentials = json.RawMessage(`{}`)
 	}
 	_, err := db.Exec(
-		`INSERT INTO bots (id, user_id, name, provider, status, credentials)
-		 VALUES ($1, $2, $3, $4, 'connected', $5)`,
-		id, userID, name, provider, credentials,
+		`INSERT INTO bots (id, user_id, name, provider, provider_id, status, credentials)
+		 VALUES ($1, $2, $3, $4, $5, 'connected', $6)`,
+		id, userID, name, provider, providerID, credentials,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &Bot{
-		ID: id, UserID: userID, Name: name, Provider: provider,
+		ID: id, UserID: userID, Name: name, Provider: provider, ProviderID: providerID,
 		Status: "connected", Credentials: credentials,
 	}, nil
 }
@@ -100,17 +101,23 @@ func (db *DB) GetAllBots() ([]Bot, error) {
 	return bots, rows.Err()
 }
 
-// FindBotByCredential finds a bot by a JSON credential field (e.g. bot_id from iLink).
+// FindBotByProviderID finds a bot by its provider-specific ID.
+func (db *DB) FindBotByProviderID(provider, providerID string) (*Bot, error) {
+	return scanBot(db.QueryRow(
+		"SELECT "+botSelectCols+" FROM bots WHERE provider = $1 AND provider_id = $2", provider, providerID))
+}
+
+// FindBotByCredential finds a bot by a JSON credential field (e.g. ilink_user_id).
 func (db *DB) FindBotByCredential(key, value string) (*Bot, error) {
 	return scanBot(db.QueryRow(
 		"SELECT "+botSelectCols+" FROM bots WHERE credentials->>$1 = $2", key, value))
 }
 
-// UpdateBotCredentials updates credentials and resets status to connected.
-func (db *DB) UpdateBotCredentials(id string, credentials json.RawMessage) error {
+// UpdateBotCredentials updates credentials, provider_id, and resets status to connected.
+func (db *DB) UpdateBotCredentials(id, providerID string, credentials json.RawMessage) error {
 	_, err := db.Exec(
-		"UPDATE bots SET credentials = $1, status = 'connected', sync_state = '{}', updated_at = NOW() WHERE id = $2",
-		credentials, id)
+		"UPDATE bots SET credentials = $1, provider_id = $2, status = 'connected', sync_state = '{}', updated_at = NOW() WHERE id = $3",
+		credentials, providerID, id)
 	return err
 }
 

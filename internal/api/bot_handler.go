@@ -141,7 +141,7 @@ func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 
 			var bot *database.Bot
 			if creds.BotID != "" {
-				existing, _ := s.DB.FindBotByCredential("bot_id", creds.BotID)
+				existing, _ := s.DB.FindBotByProviderID("ilink", creds.BotID)
 				if existing != nil {
 					if existing.UserID != entry.UserID {
 						sendEvent("error", `{"message":"this account is already bound by another user"}`)
@@ -149,7 +149,7 @@ func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 					}
 					// Same user rebinding: update credentials and restart
 					s.BotManager.StopBot(existing.ID)
-					if err := s.DB.UpdateBotCredentials(existing.ID, result.Credentials); err != nil {
+					if err := s.DB.UpdateBotCredentials(existing.ID, creds.BotID, result.Credentials); err != nil {
 						slog.Error("rebind update failed", "err", err)
 						sendEvent("error", `{"message":"rebind failed"}`)
 						return
@@ -162,7 +162,7 @@ func (s *Server) handleBindStatus(w http.ResponseWriter, r *http.Request) {
 
 			if bot == nil {
 				var err error
-				bot, err = s.DB.CreateBot(entry.UserID, "", "ilink", result.Credentials)
+				bot, err = s.DB.CreateBot(entry.UserID, "", "ilink", creds.BotID, result.Credentials)
 				if err != nil {
 					slog.Error("save bot failed", "err", err)
 					sendEvent("error", `{"message":"save failed"}`)
