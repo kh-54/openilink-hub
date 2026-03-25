@@ -2,6 +2,12 @@ version: 2
 
 project_name: openilink-hub
 
+git:
+  ignore_tags:
+    - nightly
+  # Allow dirty state from downloaded artifacts (frontend dist, darwin archives)
+  allow_dirty: true
+
 before:
   hooks:
     - go mod tidy
