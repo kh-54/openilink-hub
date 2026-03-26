@@ -483,9 +483,34 @@ POST /api/marketplace/sync/{slug}
 ### Publishing to the Registry
 
 1. Create your App on a Hub instance
-2. Request listing: `POST /api/apps/{id}/request-listing`
-3. An admin reviews and approves
-4. Once listed, the app appears in the Hub's registry (if enabled)
+2. Ensure all required fields are set:
+   - **name**, **description**, **readme**, **version**
+   - **webhook_url** (must be set and verified, unless `registry: "builtin"`)
+   - At least one **tool** or **event subscription**
+   - At least one **scope**
+3. Request listing: `POST /api/apps/{id}/request-listing`
+4. An admin reviews and approves (or rejects with a reason)
+5. Once listed, the app appears in the Hub's registry (if enabled)
+
+#### Pending Review Rules
+
+While a listing request is pending:
+- **Cosmetic fields** (name, description, icon, readme, guide) can still be updated
+- **Core fields** (webhook_url, tools, events, scopes, config_schema) are frozen -- changes are blocked
+- To modify core fields, withdraw the request first: `POST /api/apps/{id}/withdraw-listing`
+- After withdrawing, the app reverts to "unlisted" and you can make changes before re-submitting
+
+#### Auto-Revert on Core Changes
+
+If a **listed** app's core fields are updated (tools, events, scopes, config_schema, or webhook_url), the listing is automatically reverted to "pending" for re-review. Cosmetic changes do not trigger a re-review.
+
+#### Withdraw a Listing Request
+
+```
+POST /api/apps/{id}/withdraw-listing
+```
+
+Reverts a pending listing request back to "unlisted". Only works when listing is "pending".
 
 ### Registry API
 
@@ -545,6 +570,7 @@ PUT /api/admin/config/registry
 | DELETE | `/api/apps/{id}` | Delete App |
 | POST | `/api/apps/{id}/install` | Install to Bot |
 | POST | `/api/apps/{id}/request-listing` | Request listing review |
+| POST | `/api/apps/{id}/withdraw-listing` | Withdraw pending listing request |
 | POST | `/api/apps/{id}/verify-url` | Verify webhook URL |
 | GET | `/api/apps/{id}/installations` | List installations |
 | GET | `/api/apps/{id}/installations/{iid}` | Installation detail |

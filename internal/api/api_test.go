@@ -766,3 +766,257 @@ func TestBotAPI_UnknownEndpoint(t *testing.T) {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Test: Listing submission validation
+// ---------------------------------------------------------------------------
+
+func TestAppAPI_RequestListingValidation(t *testing.T) {
+	env := setupTestEnv(t)
+
+	t.Run("missing required fields rejected", func(t *testing.T) {
+		// Create a minimal app (missing description, readme, version, webhook, events/tools, scopes).
+		app := createTestApp(t, env.store, env.user.ID, "Bare App", "bare-app", nil)
+
+		resp := doJSON(t, env.ts, "POST", "/api/apps/"+app.ID+"/request-listing", nil,
+			withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", resp.StatusCode)
+		}
+		body := decodeJSON(t, resp)
+		msg, _ := body["error"].(string)
+		// Should mention multiple missing fields.
+		for _, want := range []string{"description", "readme", "version", "webhook_url", "event", "scope"} {
+			if !containsSubstring(msg, want) {
+				t.Errorf("error message %q should mention %q", msg, want)
+			}
+		}
+	})
+
+	t.Run("complete app can be listed", func(t *testing.T) {
+		tools, _ := json.Marshal([]map[string]string{{"name": "ping", "description": "ping"}})
+		events, _ := json.Marshal([]string{"command"})
+		scopes, _ := json.Marshal([]string{"message:write"})
+		app, err := env.store.CreateApp(&store.App{
+			OwnerID:     env.user.ID,
+			Name:        "Complete App",
+			Slug:        "complete-app",
+			Description: "A complete app",
+			Readme:      "# Complete App",
+			Version:     "1.0.0",
+			WebhookURL:  "https://example.com/webhook",
+			Tools:       tools,
+			Events:      events,
+			Scopes:      scopes,
+		})
+		if err != nil {
+			t.Fatalf("CreateApp: %v", err)
+		}
+		// Mark webhook as verified.
+		_ = env.store.SetAppWebhookVerified(app.ID, true)
+
+		resp := doJSON(t, env.ts, "POST", "/api/apps/"+app.ID+"/request-listing", nil,
+			withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body := decodeJSON(t, resp)
+			t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
+		}
+
+		got, _ := env.store.GetApp(app.ID)
+		if got.Listing != "pending" {
+			t.Errorf("listing = %q, want %q", got.Listing, "pending")
+		}
+	})
+
+	t.Run("unverified webhook rejected", func(t *testing.T) {
+		tools, _ := json.Marshal([]map[string]string{{"name": "ping", "description": "ping"}})
+		scopes, _ := json.Marshal([]string{"message:write"})
+		app, _ := env.store.CreateApp(&store.App{
+			OwnerID:     env.user.ID,
+			Name:        "Unverified Webhook App",
+			Slug:        "unverified-webhook-app",
+			Description: "has unverified webhook",
+			Readme:      "# App",
+			Version:     "1.0.0",
+			WebhookURL:  "https://example.com/webhook",
+			Tools:       tools,
+			Scopes:      scopes,
+		})
+
+		resp := doJSON(t, env.ts, "POST", "/api/apps/"+app.ID+"/request-listing", nil,
+			withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 for unverified webhook, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Test: Pending freeze (cannot modify core fields while pending)
+// ---------------------------------------------------------------------------
+
+func TestAppAPI_PendingFreeze(t *testing.T) {
+	env := setupTestEnv(t)
+
+	// Create a complete app and set it to pending via store directly.
+	tools, _ := json.Marshal([]map[string]string{{"name": "ping", "description": "ping"}})
+	events, _ := json.Marshal([]string{"command"})
+	scopes, _ := json.Marshal([]string{"message:write"})
+	app, _ := env.store.CreateApp(&store.App{
+		OwnerID:     env.user.ID,
+		Name:        "Freeze Test App",
+		Slug:        "freeze-test-app",
+		Description: "for freeze test",
+		Readme:      "# Freeze",
+		Version:     "1.0.0",
+		WebhookURL:  "https://example.com/webhook",
+		Tools:       tools,
+		Events:      events,
+		Scopes:      scopes,
+	})
+	_ = env.store.SetAppWebhookVerified(app.ID, true)
+	_ = env.store.RequestListing(app.ID)
+
+	t.Run("core field update blocked during pending", func(t *testing.T) {
+		resp := doJSON(t, env.ts, "PUT", "/api/apps/"+app.ID, map[string]any{
+			"tools": []map[string]string{{"name": "new-tool", "description": "new"}},
+		}, withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("expected 403 for core field update during pending, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("cosmetic update allowed during pending", func(t *testing.T) {
+		newDesc := "Updated description"
+		resp := doJSON(t, env.ts, "PUT", "/api/apps/"+app.ID, map[string]any{
+			"description": &newDesc,
+		}, withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body := decodeJSON(t, resp)
+			t.Fatalf("expected 200 for cosmetic update during pending, got %d: %v", resp.StatusCode, body)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Test: Withdraw listing request
+// ---------------------------------------------------------------------------
+
+func TestAppAPI_WithdrawListing(t *testing.T) {
+	env := setupTestEnv(t)
+
+	app, _ := env.store.CreateApp(&store.App{
+		OwnerID:     env.user.ID,
+		Name:        "Withdraw Test App",
+		Slug:        "withdraw-api-test",
+		Description: "for withdraw test",
+	})
+	_ = env.store.RequestListing(app.ID)
+
+	t.Run("withdraw pending listing", func(t *testing.T) {
+		resp := doJSON(t, env.ts, "POST", "/api/apps/"+app.ID+"/withdraw-listing", nil,
+			withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body := decodeJSON(t, resp)
+			t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
+		}
+
+		got, _ := env.store.GetApp(app.ID)
+		if got.Listing != "unlisted" {
+			t.Errorf("listing = %q, want %q", got.Listing, "unlisted")
+		}
+	})
+
+	t.Run("withdraw non-pending fails", func(t *testing.T) {
+		resp := doJSON(t, env.ts, "POST", "/api/apps/"+app.ID+"/withdraw-listing", nil,
+			withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected 400 for non-pending withdraw, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Test: Auto-revert to pending on core change for listed apps
+// ---------------------------------------------------------------------------
+
+func TestAppAPI_AutoRevertOnCoreChange(t *testing.T) {
+	env := setupTestEnv(t)
+
+	tools, _ := json.Marshal([]map[string]string{{"name": "ping", "description": "ping"}})
+	scopes, _ := json.Marshal([]string{"message:write"})
+	app, _ := env.store.CreateApp(&store.App{
+		OwnerID:     env.user.ID,
+		Name:        "Revert Test App",
+		Slug:        "revert-test-app",
+		Description: "for revert test",
+		Tools:       tools,
+		Scopes:      scopes,
+	})
+	// Set to listed directly via store.
+	_ = env.store.SetListing(app.ID, "listed")
+
+	t.Run("core change reverts listed to pending", func(t *testing.T) {
+		resp := doJSON(t, env.ts, "PUT", "/api/apps/"+app.ID, map[string]any{
+			"scopes": []string{"message:write", "contact:read"},
+		}, withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body := decodeJSON(t, resp)
+			t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
+		}
+
+		got, _ := env.store.GetApp(app.ID)
+		if got.Listing != "pending" {
+			t.Errorf("listing = %q, want %q after core change", got.Listing, "pending")
+		}
+	})
+
+	t.Run("cosmetic change does not revert listed", func(t *testing.T) {
+		// Reset to listed.
+		_ = env.store.SetListing(app.ID, "listed")
+
+		newName := "Still Listed App"
+		resp := doJSON(t, env.ts, "PUT", "/api/apps/"+app.ID, map[string]any{
+			"name": &newName,
+		}, withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+
+		got, _ := env.store.GetApp(app.ID)
+		if got.Listing != "listed" {
+			t.Errorf("listing = %q, want %q (cosmetic change should not revert)", got.Listing, "listed")
+		}
+	})
+}
+
+func containsSubstring(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(s) > 0 && contains(s, sub))
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

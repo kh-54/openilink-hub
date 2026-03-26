@@ -178,10 +178,20 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		Tools            json.RawMessage `json:"tools"`
 		Events           json.RawMessage `json:"events"`
 		Scopes           json.RawMessage `json:"scopes"`
+		ConfigSchema     *string         `json:"config_schema"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
+	}
+
+	// During review, only allow cosmetic updates (readme, description, icon).
+	// Core changes require withdrawing the listing request first.
+	if app.Listing == "pending" {
+		if req.WebhookURL != nil || req.Tools != nil || req.Events != nil || req.Scopes != nil || req.ConfigSchema != nil {
+			jsonError(w, "cannot modify core fields while listing is pending review. Withdraw the request first or wait for review.", http.StatusForbidden)
+			return
+		}
 	}
 
 	name := app.Name
@@ -212,6 +222,10 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 	if req.OAuthRedirectURL != nil {
 		oauthRedirectURL = *req.OAuthRedirectURL
 	}
+	configSchema := app.ConfigSchema
+	if req.ConfigSchema != nil {
+		configSchema = *req.ConfigSchema
+	}
 	tools := app.Tools
 	if req.Tools != nil {
 		tools = req.Tools
@@ -225,7 +239,7 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		scopes = req.Scopes
 	}
 
-	if err := s.Store.UpdateApp(appID, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, tools, events, scopes); err != nil {
+	if err := s.Store.UpdateApp(appID, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema, tools, events, scopes); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
@@ -237,6 +251,31 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		if err := s.Store.UpdateAppWebhookURL(appID, *req.WebhookURL); err != nil {
 			jsonError(w, "update webhook_url failed", http.StatusInternalServerError)
 			return
+		}
+	}
+
+	// Auto-revert listed apps to pending when core fields change.
+	if app.Listing == "listed" {
+		coreChanged := false
+		if req.WebhookURL != nil && *req.WebhookURL != app.WebhookURL {
+			coreChanged = true
+		}
+		if req.Tools != nil {
+			coreChanged = true
+		}
+		if req.Events != nil {
+			coreChanged = true
+		}
+		if req.Scopes != nil {
+			coreChanged = true
+		}
+		if req.ConfigSchema != nil && *req.ConfigSchema != app.ConfigSchema {
+			coreChanged = true
+		}
+
+		if coreChanged {
+			_ = s.Store.SetListing(appID, "pending")
+			slog.Info("listed app core fields changed, reverted to pending", "app", appID)
 		}
 	}
 
@@ -279,8 +318,63 @@ func (s *Server) handleRequestListing(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "already pending review", http.StatusBadRequest)
 		return
 	}
+
+	// Validate required fields before submitting for review.
+	var errors []string
+	if app.Name == "" {
+		errors = append(errors, "name is required")
+	}
+	if app.Description == "" {
+		errors = append(errors, "description is required")
+	}
+	if app.Readme == "" {
+		errors = append(errors, "readme is required")
+	}
+	if app.Version == "" {
+		errors = append(errors, "version is required")
+	}
+	if app.WebhookURL == "" && app.Registry != "builtin" {
+		errors = append(errors, "webhook_url is required (set and verify it first)")
+	}
+	if app.WebhookURL != "" && !app.WebhookVerified {
+		errors = append(errors, "webhook_url must be verified before listing")
+	}
+	// Must have events or tools.
+	hasEvents := len(app.Events) > 0 && string(app.Events) != "[]" && string(app.Events) != "null"
+	hasTools := len(app.Tools) > 0 && string(app.Tools) != "[]" && string(app.Tools) != "null"
+	if !hasEvents && !hasTools {
+		errors = append(errors, "at least one event subscription or tool is required")
+	}
+	// Must have scopes.
+	hasScopes := len(app.Scopes) > 0 && string(app.Scopes) != "[]" && string(app.Scopes) != "null"
+	if !hasScopes {
+		errors = append(errors, "at least one scope is required")
+	}
+
+	if len(errors) > 0 {
+		jsonError(w, "cannot submit for listing: "+strings.Join(errors, "; "), http.StatusBadRequest)
+		return
+	}
+
 	if err := s.Store.RequestListing(app.ID); err != nil {
 		jsonError(w, "request failed", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w)
+}
+
+// POST /api/apps/{id}/withdraw-listing — owner withdraws a pending listing request
+func (s *Server) handleWithdrawListing(w http.ResponseWriter, r *http.Request) {
+	app := s.requireApp(w, r)
+	if app == nil {
+		return
+	}
+	if app.Listing != "pending" {
+		jsonError(w, "not pending", http.StatusBadRequest)
+		return
+	}
+	if err := s.Store.WithdrawListing(app.ID); err != nil {
+		jsonError(w, "withdraw failed", http.StatusInternalServerError)
 		return
 	}
 	jsonOK(w)

@@ -1052,7 +1052,7 @@ func TestAppCRUD(t *testing.T, s store.Store) {
 
 	t.Run("UpdateApp", func(t *testing.T) {
 		err := s.UpdateApp(appID, "Updated App", "new desc", "icon", "http://icon.png",
-			"http://home.com", "http://setup.com", "http://redirect.com",
+			"http://home.com", "http://setup.com", "http://redirect.com", "{}",
 			json.RawMessage(`[{"name":"tool1"}]`), json.RawMessage(`["msg"]`), json.RawMessage(`["read"]`))
 		if err != nil {
 			t.Fatalf("UpdateApp: %v", err)

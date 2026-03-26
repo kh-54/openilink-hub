@@ -165,6 +165,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("DELETE /api/apps/{id}", s.handleDeleteApp)
 	protected.HandleFunc("POST /api/apps/{id}/install", s.handleInstallApp)
 	protected.HandleFunc("POST /api/apps/{id}/request-listing", s.handleRequestListing)
+	protected.HandleFunc("POST /api/apps/{id}/withdraw-listing", s.handleWithdrawListing)
 	protected.HandleFunc("GET /api/apps/{id}/installations", s.handleListInstallations)
 	protected.HandleFunc("GET /api/apps/{id}/installations/{iid}", s.handleGetInstallation)
 	protected.HandleFunc("PUT /api/apps/{id}/installations/{iid}", s.handleUpdateInstallation)

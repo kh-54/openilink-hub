@@ -263,7 +263,7 @@ func TestAppLifecycle(t *testing.T, s store.Store) {
 		newScopes, _ := json.Marshal([]string{"message:read", "message:write", "channel:read"})
 
 		err := s.UpdateApp(app.ID, "Full App Updated", "updated desc", "star", "https://new-icon.png",
-			"https://new-home.com", "https://new-setup.com", "https://new-redirect.com",
+			"https://new-home.com", "https://new-setup.com", "https://new-redirect.com", "{}",
 			newTools, newEvents, newScopes)
 		if err != nil {
 			t.Fatalf("UpdateApp: %v", err)
@@ -684,6 +684,45 @@ func TestAppLifecycle(t *testing.T, s store.Store) {
 		if got.Listing != "listed" {
 			t.Errorf("listing = %q, want %q", got.Listing, "listed")
 		}
+	})
+
+	t.Run("ListingFlow_Withdraw", func(t *testing.T) {
+		// Create a fresh app for the withdraw test.
+		withdrawApp := mustCreateApp(t, s, u.ID, "Withdraw Test App", "withdraw-test-app")
+		if err := s.RequestListing(withdrawApp.ID); err != nil {
+			t.Fatalf("RequestListing: %v", err)
+		}
+		got, _ := s.GetApp(withdrawApp.ID)
+		if got.Listing != "pending" {
+			t.Fatalf("listing = %q, want %q", got.Listing, "pending")
+		}
+		if err := s.WithdrawListing(withdrawApp.ID); err != nil {
+			t.Fatalf("WithdrawListing: %v", err)
+		}
+		got, _ = s.GetApp(withdrawApp.ID)
+		if got.Listing != "unlisted" {
+			t.Errorf("listing = %q, want %q after withdraw", got.Listing, "unlisted")
+		}
+		s.DeleteApp(withdrawApp.ID)
+	})
+
+	t.Run("SetListing", func(t *testing.T) {
+		setApp := mustCreateApp(t, s, u.ID, "SetListing Test App", "setlisting-test-app")
+		if err := s.SetListing(setApp.ID, "pending"); err != nil {
+			t.Fatalf("SetListing(pending): %v", err)
+		}
+		got, _ := s.GetApp(setApp.ID)
+		if got.Listing != "pending" {
+			t.Errorf("listing = %q, want %q", got.Listing, "pending")
+		}
+		if err := s.SetListing(setApp.ID, "listed"); err != nil {
+			t.Fatalf("SetListing(listed): %v", err)
+		}
+		got, _ = s.GetApp(setApp.ID)
+		if got.Listing != "listed" {
+			t.Errorf("listing = %q, want %q", got.Listing, "listed")
+		}
+		s.DeleteApp(setApp.ID)
 	})
 
 	t.Run("ListListedApps", func(t *testing.T) {

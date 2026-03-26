@@ -74,7 +74,7 @@ type AppStore interface {
 	ListListedApps() ([]App, error)
 	ListAllApps() ([]App, error)
 	ListMarketplaceApps() ([]App, error)
-	UpdateApp(id string, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL string, tools, events, scopes json.RawMessage) error
+	UpdateApp(id string, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema string, tools, events, scopes json.RawMessage) error
 	UpdateMarketplaceApp(id, name, description, iconURL, homepage, webhookURL, oauthSetupURL, oauthRedirectURL, version, guide string, tools, events, scopes json.RawMessage) error
 	DeleteApp(id string) error
 	InstallApp(appID, botID string) (*AppInstallation, error)
@@ -93,4 +93,6 @@ type AppStore interface {
 	CleanExpiredOAuthCodes()
 	RequestListing(id string) error
 	ReviewListing(id string, approve bool, reason string) error
+	WithdrawListing(id string) error
+	SetListing(id, listing string) error
 }

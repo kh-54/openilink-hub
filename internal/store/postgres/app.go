@@ -215,10 +215,10 @@ func (db *DB) ListMarketplaceApps() ([]store.App, error) {
 	return apps, rows.Err()
 }
 
-func (db *DB) UpdateApp(id string, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL string, tools, events, scopes json.RawMessage) error {
+func (db *DB) UpdateApp(id string, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema string, tools, events, scopes json.RawMessage) error {
 	_, err := db.Exec(`UPDATE apps SET name=$1, description=$2, icon=$3, icon_url=$4, homepage=$5,
-		tools=$6, events=$7, scopes=$8, oauth_setup_url=$9, oauth_redirect_url=$10, updated_at=NOW() WHERE id=$11`,
-		name, description, icon, iconURL, homepage, tools, events, scopes, oauthSetupURL, oauthRedirectURL, id)
+		tools=$6, events=$7, scopes=$8, oauth_setup_url=$9, oauth_redirect_url=$10, config_schema=$11, updated_at=NOW() WHERE id=$12`,
+		name, description, icon, iconURL, homepage, tools, events, scopes, oauthSetupURL, oauthRedirectURL, configSchema, id)
 	return err
 }
 
@@ -410,5 +410,15 @@ func (db *DB) ReviewListing(id string, approve bool, reason string) error {
 		return err
 	}
 	_, err := db.Exec("UPDATE apps SET listing='rejected', listing_reject_reason=$1, updated_at=NOW() WHERE id=$2", reason, id)
+	return err
+}
+
+func (db *DB) WithdrawListing(id string) error {
+	_, err := db.Exec("UPDATE apps SET listing='unlisted', updated_at=NOW() WHERE id=$1", id)
+	return err
+}
+
+func (db *DB) SetListing(id, listing string) error {
+	_, err := db.Exec("UPDATE apps SET listing=$1, updated_at=NOW() WHERE id=$2", listing, id)
 	return err
 }
