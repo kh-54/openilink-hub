@@ -42,6 +42,7 @@ export function BotDetailPage() {
   const [channels, setChannels] = useState<any[]>([]);
   const [installations, setInstallations] = useState<any[]>([]);
   const [builtinApps, setBuiltinApps] = useState<any[]>([]);
+  const [listedApps, setListedApps] = useState<any[]>([]);
   const [marketplaceApps, setMarketplaceApps] = useState<any[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -72,11 +73,15 @@ export function BotDetailPage() {
   const loadMarketplace = useCallback(async () => {
     setMarketplaceLoading(true);
     try {
-      const [builtin, marketplace] = await Promise.all([
+      const [builtin, listed, marketplace] = await Promise.all([
         api.getBuiltinApps().catch(() => []),
+        api.listApps({ listing: "listed" }).catch(() => []),
         api.getMarketplaceApps().catch(() => []),
       ]);
       setBuiltinApps(builtin || []);
+      // Listed apps excluding builtins (they're shown separately)
+      const builtinSlugs = new Set((builtin || []).map((a: any) => a.slug));
+      setListedApps((listed || []).filter((a: any) => !builtinSlugs.has(a.slug)));
       setMarketplaceApps(marketplace || []);
     } finally {
       setMarketplaceLoading(false);
@@ -327,7 +332,40 @@ export function BotDetailPage() {
           </div>
         )}
 
-        {/* Marketplace Apps */}
+        {/* Listed Apps (local apps that are publicly listed) */}
+        {!marketplaceLoading && listedApps.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-xs font-medium text-muted-foreground">推荐应用</h4>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {listedApps.map((app: any) => (
+                <Card key={app.id} className="group relative overflow-hidden rounded-[2rem] border-border/50 bg-card/50 transition-all hover:shadow-2xl hover:-translate-y-1">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start gap-4">
+                      <AppIcon icon={app.icon} iconUrl={app.icon_url} />
+                      <div className="min-w-0 space-y-1 pt-1">
+                        <CardTitle className="text-lg font-bold truncate group-hover:text-primary transition-colors">{app.name}</CardTitle>
+                        {app.version && <Badge variant="outline" className="text-[10px] font-mono">v{app.version}</Badge>}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-3 space-y-2">
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{app.description}</p>
+                    {app.tools?.length > 0 && (
+                      <p className="text-[10px] text-muted-foreground">{typeof app.tools === 'string' ? JSON.parse(app.tools).length : app.tools.length} 个命令</p>
+                    )}
+                  </CardContent>
+                  <CardFooter className="pt-0">
+                    <Button size="sm" onClick={() => navigate(`/dashboard/accounts/${id}/install/${app.id}`)} className="h-8 rounded-full px-4 gap-1.5 font-bold text-xs shadow-lg shadow-primary/10">
+                      安装 <Download className="h-3 w-3" />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Marketplace Apps (from remote registries) */}
         <div className="space-y-3">
           <h4 className="text-xs font-medium text-muted-foreground">应用市场</h4>
           {marketplaceLoading ? (
@@ -337,7 +375,7 @@ export function BotDetailPage() {
           ) : marketplaceApps.length === 0 ? (
             <div className="text-center py-12 space-y-3 border-2 border-dashed rounded-2xl">
               <Blocks className="w-10 h-10 mx-auto text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">市场暂无应用</p>
+              <p className="text-sm text-muted-foreground">暂无远程市场应用</p>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
