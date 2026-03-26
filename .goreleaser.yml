@@ -21,22 +21,10 @@ builds:
       - -X main.commit={{.ShortCommit}}
       - -X main.date={{.Date}}
 
-  - id: windows-amd64
-    binary: openilink-hub
-    goos: [windows]
-    goarch: [amd64]
-    env:
-      - CGO_ENABLED=0
-    ldflags: *ldflags
-
 archives:
   - id: default
     formats:
       - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
 
