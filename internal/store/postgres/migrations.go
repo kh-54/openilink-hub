@@ -13,16 +13,16 @@ import (
 var migrationsFS embed.FS
 
 func runMigrations(db *sql.DB) error {
-	// Migrate from old schema_version table to goose if needed
-	if err := migrateFromLegacy(db); err != nil {
-		return fmt.Errorf("legacy migration failed: %w", err)
-	}
-
 	// Advisory lock to prevent concurrent migration runs (multiple app instances)
 	if _, err := db.Exec("SELECT pg_advisory_lock(1)"); err != nil {
 		return fmt.Errorf("advisory lock: %w", err)
 	}
 	defer db.Exec("SELECT pg_advisory_unlock(1)")
+
+	// Migrate from old schema_version table to goose if needed (inside lock)
+	if err := migrateFromLegacy(db); err != nil {
+		return fmt.Errorf("legacy migration failed: %w", err)
+	}
 
 	goose.SetBaseFS(migrationsFS)
 	goose.SetLogger(goose.NopLogger())
