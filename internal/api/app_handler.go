@@ -39,6 +39,7 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		Tools            json.RawMessage `json:"tools"`
 		Events           json.RawMessage `json:"events"`
 		Scopes           json.RawMessage `json:"scopes"`
+		Version          string          `json:"version"`
 		Readme           string          `json:"readme"`
 		Guide            string          `json:"guide"`
 		ConfigSchema     string `json:"config_schema"`
@@ -86,6 +87,7 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		Tools:            req.Tools,
 		Events:           req.Events,
 		Scopes:           req.Scopes,
+		Version:          req.Version,
 		Readme:           req.Readme,
 		Guide:            req.Guide,
 		ConfigSchema:     req.ConfigSchema,
@@ -188,6 +190,9 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		Events           json.RawMessage `json:"events"`
 		Scopes           json.RawMessage `json:"scopes"`
 		ConfigSchema     *string         `json:"config_schema"`
+		Version          *string         `json:"version"`
+		Readme           *string         `json:"readme"`
+		Guide            *string         `json:"guide"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -242,6 +247,18 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 	if req.ConfigSchema != nil {
 		configSchema = *req.ConfigSchema
 	}
+	version := app.Version
+	if req.Version != nil {
+		version = *req.Version
+	}
+	readme := app.Readme
+	if req.Readme != nil {
+		readme = *req.Readme
+	}
+	guide := app.Guide
+	if req.Guide != nil {
+		guide = *req.Guide
+	}
 	tools := app.Tools
 	if req.Tools != nil {
 		tools = req.Tools
@@ -255,7 +272,7 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		scopes = req.Scopes
 	}
 
-	if err := s.Store.UpdateApp(appID, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema, tools, events, scopes); err != nil {
+	if err := s.Store.UpdateApp(appID, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema, version, readme, guide, tools, events, scopes); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
@@ -286,6 +303,9 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 			coreChanged = true
 		}
 		if req.ConfigSchema != nil && *req.ConfigSchema != app.ConfigSchema {
+			coreChanged = true
+		}
+		if req.Version != nil && *req.Version != app.Version {
 			coreChanged = true
 		}
 

@@ -175,6 +175,9 @@ function BasicInfoSection({ app, onUpdate }: { app: any; onUpdate: () => void })
     description: app.description || "",
     icon: app.icon || "",
     homepage: app.homepage || "",
+    version: app.version || "",
+    readme: app.readme || "",
+    guide: app.guide || "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -243,6 +246,27 @@ function BasicInfoSection({ app, onUpdate }: { app: any; onUpdate: () => void })
               value={form.homepage}
               onChange={(e) => setForm((f) => ({ ...f, homepage: e.target.value }))}
               className="h-8 text-xs"
+              disabled={!!app.registry}
+            />
+            <Input
+              placeholder="版本号 (如 1.0.0)"
+              value={form.version}
+              onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))}
+              className="h-8 text-xs"
+              disabled={!!app.registry}
+            />
+            <textarea
+              placeholder="说明文档 (Readme)"
+              value={form.readme}
+              onChange={(e) => setForm((f) => ({ ...f, readme: e.target.value }))}
+              className="w-full min-h-[80px] px-3 py-2 rounded-md border bg-background text-xs font-mono resize-y"
+              disabled={!!app.registry}
+            />
+            <textarea
+              placeholder="使用指南 (Guide)"
+              value={form.guide}
+              onChange={(e) => setForm((f) => ({ ...f, guide: e.target.value }))}
+              className="w-full min-h-[80px] px-3 py-2 rounded-md border bg-background text-xs font-mono resize-y"
               disabled={!!app.registry}
             />
             {!app.registry ? (

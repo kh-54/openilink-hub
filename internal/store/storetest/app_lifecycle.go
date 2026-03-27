@@ -264,7 +264,7 @@ func TestAppLifecycle(t *testing.T, s store.Store) {
 
 		err := s.UpdateApp(app.ID, "Full App Updated", "updated desc", "star", "https://new-icon.png",
 			"https://new-home.com", "https://new-setup.com", "https://new-redirect.com", "{}",
-			newTools, newEvents, newScopes)
+			"2.0.0", "updated readme", "updated guide", newTools, newEvents, newScopes)
 		if err != nil {
 			t.Fatalf("UpdateApp: %v", err)
 		}

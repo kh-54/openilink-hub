@@ -218,10 +218,11 @@ func (db *DB) ListMarketplaceApps() ([]store.App, error) {
 	return apps, rows.Err()
 }
 
-func (db *DB) UpdateApp(id string, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema string, tools, events, scopes json.RawMessage) error {
+func (db *DB) UpdateApp(id string, name, description, icon, iconURL, homepage, oauthSetupURL, oauthRedirectURL, configSchema, version, readme, guide string, tools, events, scopes json.RawMessage) error {
 	_, err := db.Exec(`UPDATE apps SET name=?, description=?, icon=?, icon_url=?, homepage=?,
-		tools=?, events=?, scopes=?, oauth_setup_url=?, oauth_redirect_url=?, config_schema=?, updated_at=unixepoch() WHERE id=?`,
-		name, description, icon, iconURL, homepage, tools, events, scopes, oauthSetupURL, oauthRedirectURL, configSchema, id)
+		tools=?, events=?, scopes=?, oauth_setup_url=?, oauth_redirect_url=?, config_schema=?,
+		version=?, readme=?, guide=?, updated_at=unixepoch() WHERE id=?`,
+		name, description, icon, iconURL, homepage, tools, events, scopes, oauthSetupURL, oauthRedirectURL, configSchema, version, readme, guide, id)
 	return err
 }
 
