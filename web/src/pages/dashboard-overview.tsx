@@ -25,6 +25,8 @@ const STEPS = [
     desc: "扫码登录你的微信，连接到平台。",
     link: "/dashboard/accounts",
     icon: Cpu,
+    color: "text-blue-500",
+    bg: "bg-blue-500/10",
   },
   {
     step: "02",
@@ -32,6 +34,8 @@ const STEPS = [
     desc: "设置消息转发到你的服务器或 AI。",
     link: "/dashboard/accounts",
     icon: Workflow,
+    color: "text-violet-500",
+    bg: "bg-violet-500/10",
   },
   {
     step: "03",
@@ -39,6 +43,8 @@ const STEPS = [
     desc: "从市场安装现成的扩展功能。",
     link: "/dashboard/apps",
     icon: Zap,
+    color: "text-orange-500",
+    bg: "bg-orange-500/10",
   },
 ] as const;
 
@@ -237,16 +243,20 @@ export function DashboardOverviewPage() {
                 <Link
                   key={i}
                   to={item.link}
-                  className="flex items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors group"
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-muted/40 transition-colors group"
                 >
-                  <span className="text-sm font-bold text-muted-foreground/40 group-hover:text-primary/50 transition-colors w-6 shrink-0">
+                  <span className="text-xs font-bold tabular-nums text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors w-5 shrink-0">
                     {item.step}
                   </span>
-                  <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
-                    <item.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div
+                    className={`h-9 w-9 rounded-lg ${item.bg} flex items-center justify-center shrink-0 transition-colors`}
+                  >
+                    <item.icon className={`h-4 w-4 ${item.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold">{item.title}</h4>
+                    <h4 className="text-sm font-semibold group-hover:text-primary transition-colors">
+                      {item.title}
+                    </h4>
                     <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />

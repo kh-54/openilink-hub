@@ -271,21 +271,8 @@ export function BotDetailPage() {
             <div className="text-center py-16 space-y-3 border-2 border-dashed rounded-xl">
               <Blocks className="w-8 h-8 mx-auto text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">暂无安装的应用</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const el = marketplaceRef.current;
-                  if (!el) return;
-                  const container = el.closest("main") as HTMLElement | null;
-                  if (container) {
-                    container.scrollTo({ top: el.offsetTop - 32, behavior: "smooth" });
-                  } else {
-                    el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }
-                }}
-              >
-                去应用市场看看
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/dashboard/apps">去应用市场看看</Link>
               </Button>
             </div>
           ) : (
