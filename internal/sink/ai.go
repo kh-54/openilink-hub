@@ -672,6 +672,7 @@ func (s *AI) resolveGlobalConfig() store.AIConfig {
 	cfg.Model = global["ai.model"]
 	cfg.SystemPrompt = global["ai.system_prompt"]
 	cfg.HideThinking = global["ai.hide_thinking"] == "true"
+	cfg.StripMarkdown = global["ai.strip_markdown"] == "true"
 	if v := global["ai.max_history"]; v != "" {
 		fmt.Sscanf(v, "%d", &cfg.MaxHistory)
 	}
