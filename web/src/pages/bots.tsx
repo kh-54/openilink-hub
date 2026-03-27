@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import QRCode from "qrcode";
 import { Button } from "../components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../components/ui/card";
+import { Card, CardContent, CardFooter } from "../components/ui/card";
 import {
   Plus,
   Trash2,
@@ -14,6 +14,9 @@ import {
   AlertCircle,
   MoreVertical,
   ArrowUpRight,
+  Cpu,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { api } from "../lib/api";
 import {
@@ -32,11 +35,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
-const statusConfig: Record<string, { label: string; variant: any; color: string }> = {
-  connected: { label: "运行中", variant: "default", color: "text-green-500" },
-  disconnected: { label: "离线", variant: "outline", color: "text-muted-foreground" },
-  error: { label: "故障", variant: "destructive", color: "text-destructive" },
-  session_expired: { label: "授权过期", variant: "destructive", color: "text-destructive" },
+const statusConfig: Record<
+  string,
+  { label: string; variant: "default" | "destructive" | "outline"; dot: string }
+> = {
+  connected: { label: "运行中", variant: "default", dot: "bg-green-500" },
+  disconnected: { label: "离线", variant: "outline", dot: "bg-muted-foreground" },
+  error: { label: "故障", variant: "destructive", dot: "bg-destructive" },
+  session_expired: { label: "授权过期", variant: "destructive", dot: "bg-destructive" },
 };
 
 export function BotsPage() {
@@ -109,7 +115,7 @@ export function BotsPage() {
           <p className="text-sm text-muted-foreground mt-0.5">管理你的微信账号。</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <Button variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> 刷新
           </Button>
           <Dialog
@@ -216,6 +222,7 @@ function BotInstanceCard({
 }) {
   const { toast } = useToast();
   const status = statusConfig[bot.status] || statusConfig.disconnected;
+  const isOnline = bot.status === "connected";
 
   async function handleAction(action: string) {
     try {
@@ -234,26 +241,25 @@ function BotInstanceCard({
   }
 
   return (
-    <Card className="group relative overflow-hidden border-border/50 transition-all hover:shadow-2xl hover:border-primary/20 bg-card/50">
-      <div
-        className={`absolute top-0 left-0 w-1 h-full ${status.variant === "default" ? "bg-primary" : "bg-destructive"}`}
-      />
-
-      <CardHeader className="pb-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-              <BotIcon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+    <Card className="group flex flex-col border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200">
+      <CardContent className="p-5 flex-1 space-y-4">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                isOnline ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {isOnline ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}
             </div>
-            <div className="space-y-0.5">
-              <CardTitle className="text-lg font-bold">{bot.name}</CardTitle>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <p className="font-semibold leading-tight truncate">{bot.name}</p>
+              <div className="flex items-center gap-1.5 mt-1">
                 <span
-                  className={`size-1.5 rounded-full animate-pulse ${status.color.replace("text", "bg")}`}
+                  className={`size-1.5 rounded-full shrink-0 ${status.dot} ${isOnline ? "animate-pulse" : ""}`}
                 />
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${status.color}`}>
-                  {status.label}
-                </span>
+                <span className="text-xs text-muted-foreground">{status.label}</span>
               </div>
             </div>
           </div>
@@ -261,13 +267,13 @@ function BotInstanceCard({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                size="icon-sm"
+                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40 rounded-xl">
+            <DropdownMenuContent align="end" className="w-40">
               {bot.status !== "session_expired" ? (
                 <DropdownMenuItem onClick={() => handleAction("reconnect")} className="gap-2">
                   <RefreshCw className="h-3.5 w-3.5" /> 重新连接
@@ -282,68 +288,57 @@ function BotInstanceCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </CardHeader>
 
-      <CardContent className="pb-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
-              消息数
-            </p>
-            <div className="flex items-center gap-1.5">
-              <MessageCircle className="h-3.5 w-3.5 text-primary/60" />
-              <span className="text-sm font-bold">
-                {bot.msg_count || 0}{" "}
-                <span className="text-[10px] font-normal opacity-60">MSGS</span>
-              </span>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
-              自动续期
-            </p>
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-orange-500/60" />
-              <span className="text-sm font-bold">
-                {bot.reminder_hours ? `提前 ${24 - bot.reminder_hours}h` : "不提醒"}
-              </span>
-            </div>
-          </div>
+        {/* Meta info */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Cpu className="h-3 w-3 shrink-0" />
+          <span className="capitalize">{bot.provider || "未知平台"}</span>
+          <span className="text-border mx-0.5">·</span>
+          <span className="font-mono">{bot.id.slice(0, 8)}</span>
         </div>
 
-        {bot.status === "session_expired" ? (
-          <div className="mt-4 space-y-2 rounded-xl bg-destructive/5 p-3 border border-destructive/10">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
-              <p className="text-[11px] font-medium text-destructive leading-snug flex-1">
-                会话已过期。请先在微信中给该账号发送一条消息以恢复连接。
-              </p>
+        {/* Stats row */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MessageCircle className="h-3.5 w-3.5" />
+            <span>{bot.msg_count ?? 0} 消息</span>
+          </div>
+          {bot.reminder_hours ? (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 text-orange-500" />
+              <span>提前 {24 - bot.reminder_hours}h 提醒</span>
             </div>
-            <p className="text-[10px] text-muted-foreground pl-6">
-              如果发送消息后仍无法恢复，请
-              <Button
-                type="button"
-                variant="link"
-                size="xs"
-                className="px-0.5 h-auto underline text-destructive"
-                onClick={onRebind}
-              >
-                重新扫码绑定
-              </Button>
-              。
-            </p>
+          ) : null}
+        </div>
+
+        {/* Session expired warning */}
+        {bot.status === "session_expired" ? (
+          <div className="rounded-lg bg-destructive/5 border border-destructive/10 p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 text-destructive shrink-0" />
+              <div className="space-y-1">
+                <p className="text-xs text-destructive leading-snug">
+                  会话已过期，请在微信中给该账号发一条消息以恢复连接。
+                </p>
+                <Button
+                  variant="link"
+                  size="xs"
+                  className="h-auto p-0 text-destructive text-xs underline"
+                  onClick={onRebind}
+                >
+                  或重新扫码绑定
+                </Button>
+              </div>
+            </div>
           </div>
         ) : null}
       </CardContent>
 
-      <CardFooter className="bg-muted/30 pt-4 flex gap-2">
-        <Button
-          className="flex-1 h-9 rounded-lg gap-2 font-bold text-xs"
-          variant="secondary"
-          asChild
-        >
+      <CardFooter className="px-5 pb-5 pt-0">
+        <Button size="sm" className="w-full gap-1.5" asChild>
           <Link to={`/dashboard/accounts/${bot.id}`}>
-            查看详情 <ArrowUpRight className="h-3 w-3" />
+            查看详情
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </Button>
       </CardFooter>
