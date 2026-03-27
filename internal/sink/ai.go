@@ -352,6 +352,10 @@ func (s *AI) reply(d Delivery) {
 		}
 	}
 
+	if cfg.StripMarkdown {
+		reply = ai.StripMarkdown(reply)
+	}
+
 	if reply == "" {
 		if span != nil {
 			span.SetAttr("reply.content", "(empty)")
