@@ -18,6 +18,37 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const STEPS = [
+  {
+    step: "01",
+    title: "添加微信账号",
+    desc: "扫码登录你的微信，连接到平台。",
+    link: "/dashboard/accounts",
+    icon: Cpu,
+  },
+  {
+    step: "02",
+    title: "创建转发规则",
+    desc: "设置消息转发到你的服务器或 AI。",
+    link: "/dashboard/accounts",
+    icon: Workflow,
+  },
+  {
+    step: "03",
+    title: "安装应用",
+    desc: "从市场安装现成的扩展功能。",
+    link: "/dashboard/apps",
+    icon: Zap,
+  },
+] as const;
+
+const QUICK_LINKS = [
+  { label: "全部账号", icon: Bot, link: "/dashboard/accounts" },
+  { label: "应用市场", icon: Workflow, link: "/dashboard/apps" },
+  { label: "消息追踪", icon: MessageSquare, link: "/dashboard/traces" },
+  { label: "系统设置", icon: Cpu, link: "/dashboard/settings/profile" },
+] as const;
+
 export function DashboardOverviewPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,10 +85,13 @@ export function DashboardOverviewPage() {
 
   return (
     <div className="space-y-6">
-      {/* Actions Row */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">查看账号状态和消息统计。</p>
-        <div className="flex items-center gap-2">
+      {/* Page Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">概览</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">查看账号状态和消息统计。</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -81,36 +115,39 @@ export function DashboardOverviewPage() {
         {[
           {
             label: "在线账号",
-            value: stats?.online_bots || 0,
-            sub: `共 ${stats?.total_bots || 0} 个`,
+            value: stats?.online_bots ?? 0,
+            sub: `共 ${stats?.total_bots ?? 0} 个`,
             icon: Bot,
             color: "text-blue-500",
             bg: "bg-blue-500/10",
-            badge: stats?.online_bots > 0 ? "online" : undefined,
+            badge: (stats?.online_bots ?? 0) > 0,
           },
           {
             label: "消息总量",
-            value: stats?.total_messages || 0,
+            value: stats?.total_messages ?? 0,
             sub: "历史累计",
             icon: MessageSquare,
             color: "text-emerald-500",
             bg: "bg-emerald-500/10",
+            badge: false,
           },
           {
             label: "已安装应用",
-            value: stats?.total_installations || 0,
+            value: stats?.total_installations ?? 0,
             sub: "个插件",
             icon: Workflow,
             color: "text-violet-500",
             bg: "bg-violet-500/10",
+            badge: false,
           },
           {
             label: "WebSocket 连接",
-            value: stats?.connected_ws || 0,
+            value: stats?.connected_ws ?? 0,
             sub: "活跃连接",
             icon: Wifi,
             color: "text-orange-500",
             bg: "bg-orange-500/10",
+            badge: false,
           },
         ].map((m, i) => (
           <Card
@@ -124,14 +161,14 @@ export function DashboardOverviewPage() {
                 >
                   <m.icon className="h-4 w-4" />
                 </div>
-                {m.badge && (
+                {m.badge ? (
                   <Badge
                     variant="outline"
                     className="text-[10px] h-5 px-1.5 text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
                   >
                     在线
                   </Badge>
-                )}
+                ) : null}
               </div>
               <div className="space-y-0.5">
                 <div className="text-2xl font-bold tabular-nums">{m.value.toLocaleString()}</div>
@@ -145,7 +182,7 @@ export function DashboardOverviewPage() {
         ))}
       </div>
 
-      {stats?.online_bots === 0 && (
+      {(stats?.online_bots ?? 0) === 0 ? (
         <div className="flex items-center gap-3 p-4 rounded-lg border border-destructive/20 bg-destructive/5">
           <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
           <div className="flex-1 min-w-0">
@@ -163,7 +200,7 @@ export function DashboardOverviewPage() {
             立即添加
           </Button>
         </div>
-      )}
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-7">
         {/* Quick Start Roadmap */}
@@ -181,29 +218,7 @@ export function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border/50">
-              {[
-                {
-                  step: "01",
-                  title: "添加微信账号",
-                  desc: "扫码登录你的微信，连接到平台。",
-                  link: "/dashboard/accounts",
-                  icon: Cpu,
-                },
-                {
-                  step: "02",
-                  title: "创建转发规则",
-                  desc: "设置消息转发到你的服务器或 AI。",
-                  link: "/dashboard/accounts",
-                  icon: Workflow,
-                },
-                {
-                  step: "03",
-                  title: "安装应用",
-                  desc: "从市场安装现成的扩展功能。",
-                  link: "/dashboard/apps",
-                  icon: Zap,
-                },
-              ].map((item, i) => (
+              {STEPS.map((item, i) => (
                 <Link
                   key={i}
                   to={item.link}
@@ -234,12 +249,7 @@ export function DashboardOverviewPage() {
               <CardDescription className="text-xs">常用功能直达</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2 pt-0">
-              {[
-                { label: "全部账号", icon: Bot, link: "/dashboard/accounts" },
-                { label: "应用市场", icon: Workflow, link: "/dashboard/apps" },
-                { label: "消息追踪", icon: MessageSquare, link: "/dashboard/traces" },
-                { label: "系统设置", icon: Cpu, link: "/dashboard/settings/profile" },
-              ].map((item) => (
+              {QUICK_LINKS.map((item) => (
                 <Button
                   key={item.link}
                   variant="outline"
