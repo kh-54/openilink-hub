@@ -136,6 +136,7 @@ func (s *Server) handleGetAIConfig(w http.ResponseWriter, r *http.Request) {
 		"system_prompt":    dbConf["ai.system_prompt"],
 		"max_history":      dbConf["ai.max_history"],
 		"hide_thinking":    dbConf["ai.hide_thinking"],
+		"strip_markdown":   dbConf["ai.strip_markdown"],
 		"available_models": dbConf["ai.available_models"],
 	}
 	if dbConf["ai.api_key"] != "" {
@@ -154,6 +155,7 @@ func (s *Server) handleSetAIConfig(w http.ResponseWriter, r *http.Request) {
 		SystemPrompt    string `json:"system_prompt"`
 		MaxHistory      string `json:"max_history"`
 		HideThinking    string `json:"hide_thinking"`
+		StripMarkdown   string `json:"strip_markdown"`
 		AvailableModels string `json:"available_models"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -178,6 +180,9 @@ func (s *Server) handleSetAIConfig(w http.ResponseWriter, r *http.Request) {
 	if req.HideThinking != "" {
 		s.Store.SetConfig("ai.hide_thinking", req.HideThinking)
 	}
+	if req.StripMarkdown != "" {
+		s.Store.SetConfig("ai.strip_markdown", req.StripMarkdown)
+	}
 	if req.AvailableModels != "" {
 		s.Store.SetConfig("ai.available_models", req.AvailableModels)
 	}
@@ -189,7 +194,10 @@ func (s *Server) handleDeleteAIConfig(w http.ResponseWriter, r *http.Request) {
 	s.Store.DeleteConfig("ai.base_url")
 	s.Store.DeleteConfig("ai.api_key")
 	s.Store.DeleteConfig("ai.model")
+	s.Store.DeleteConfig("ai.system_prompt")
+	s.Store.DeleteConfig("ai.max_history")
 	s.Store.DeleteConfig("ai.hide_thinking")
+	s.Store.DeleteConfig("ai.strip_markdown")
 	s.Store.DeleteConfig("ai.available_models")
 	jsonOK(w)
 }

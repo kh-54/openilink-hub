@@ -229,6 +229,18 @@ export function AdminOverviewPage() {
                 }
               />
             </div>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50">
+              <div>
+                <p className="text-sm font-medium">Markdown 转纯文本</p>
+                <p className="text-xs text-muted-foreground">启用后将 AI 回复中的 Markdown 格式转为纯文本</p>
+              </div>
+              <Switch
+                checked={aiConfig?.strip_markdown === "true"}
+                onCheckedChange={(checked) =>
+                  setAIConfig({ ...aiConfig, strip_markdown: checked ? "true" : "false" })
+                }
+              />
+            </div>
           </CardContent>
           <CardFooter className="flex justify-end">
             <Button onClick={handleSaveAI} disabled={saving}>

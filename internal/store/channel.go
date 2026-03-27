@@ -14,7 +14,8 @@ type AIConfig struct {
 	Model        string `json:"model,omitempty"`
 	SystemPrompt string `json:"system_prompt,omitempty"`
 	MaxHistory   int    `json:"max_history,omitempty"`
-	HideThinking bool   `json:"hide_thinking,omitempty"`
+	HideThinking  bool `json:"hide_thinking,omitempty"`
+	StripMarkdown  bool `json:"strip_markdown,omitempty"`
 }
 
 type WebhookConfig struct {

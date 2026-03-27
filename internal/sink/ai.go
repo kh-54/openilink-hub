@@ -364,6 +364,12 @@ func (s *AI) reply(d Delivery) {
 		}
 	}
 
+	// StripMarkdown runs after thinking is prepended, so both the thinking
+	// content and the main reply are stripped when HideThinking=false.
+	if cfg.StripMarkdown {
+		reply = ai.StripMarkdown(reply)
+	}
+
 	if reply == "" {
 		if span != nil {
 			span.SetAttr("reply.content", "(empty)")
@@ -700,6 +706,7 @@ func (s *AI) resolveGlobalConfig() store.AIConfig {
 	cfg.Model = global["ai.model"]
 	cfg.SystemPrompt = global["ai.system_prompt"]
 	cfg.HideThinking = global["ai.hide_thinking"] == "true"
+	cfg.StripMarkdown = global["ai.strip_markdown"] == "true"
 	if v := global["ai.max_history"]; v != "" {
 		fmt.Sscanf(v, "%d", &cfg.MaxHistory)
 	}
