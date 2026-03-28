@@ -183,6 +183,8 @@ func (s *Store) GetAdminStats() (*store.AdminStats, error) {
 	for _, b := range s.bots {
 		if b.Status == "connected" {
 			stats.OnlineBots++
+		} else if b.Status == "session_expired" {
+			stats.ExpiredBots++
 		}
 	}
 	for _, inst := range s.installations {
