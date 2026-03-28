@@ -20,6 +20,7 @@ import {
   Smartphone,
   Fingerprint,
   Clock,
+  Pencil,
 } from "lucide-react";
 import { useTheme, type Theme } from "../lib/theme";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -347,10 +348,14 @@ function ChangePasswordSection() {
   );
 }
 
+const isXiaomiDevice = () => /xiaomi|redmi|miui|hyperos/i.test(navigator.userAgent);
+
 function PasskeySection() {
   const [passkeys, setPasskeys] = useState<any[]>([]);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showXiaomiGuide, setShowXiaomiGuide] = useState(false);
 
   async function load() {
     try {
@@ -364,8 +369,16 @@ function PasskeySection() {
   }, []);
 
   async function handleAdd() {
+    if (isXiaomiDevice() && !showXiaomiGuide) {
+      setShowXiaomiGuide(true);
+      return;
+    }
+    const name = window.prompt("为此通行密钥命名（如：工作电脑、iPhone）", "Passkey");
+    if (name === null) return; // user cancelled
     setAdding(true);
     setError("");
+    setSuccess("");
+    setShowXiaomiGuide(false);
     try {
       const options = await api.passkeyBindBegin();
       options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
@@ -388,8 +401,10 @@ function PasskeySection() {
             clientDataJSON: bufferToBase64url(response.clientDataJSON),
           },
         }),
+        name || "Passkey",
       );
-      load();
+      await load();
+      setSuccess("通行密钥注册成功！建议立即退出并尝试使用通行密钥登录，以确认可正常使用。");
     } catch (err: any) {
       if (err.name !== "NotAllowedError") setError(err.message || "Passkey 注册失败");
     }
@@ -424,6 +439,35 @@ function PasskeySection() {
           </div>
         ) : null}
 
+        {success ? (
+          <div className="text-xs p-3 rounded-lg bg-green-500/5 text-green-600 border border-green-500/10">
+            {success}
+          </div>
+        ) : null}
+
+        {showXiaomiGuide ? (
+          <div className="text-xs p-4 rounded-lg bg-amber-500/5 text-amber-700 dark:text-amber-400 border border-amber-500/15 space-y-2.5">
+            <p className="font-bold flex items-center gap-1.5">
+              <AlertCircle className="h-3.5 w-3.5" />
+              小米 / 红米设备请先确认以下设置
+            </p>
+            <ol className="list-decimal ml-4 space-y-1.5 leading-relaxed">
+              <li>打开 <b>设置 &gt; 指纹、面部与密码 &gt; 智能密码管理</b>，<b>关闭</b>"自动填充密码与通行密钥"</li>
+              <li>打开 <b>设置 &gt; 更多设置 &gt; 语言与输入法 &gt; 密码与账号</b>，将"首选服务"设为 <b>Google</b> 或 <b>小米智能密码管理</b></li>
+              <li>确保 Google Play 服务已更新到最新版本</li>
+            </ol>
+            <p className="text-[10px] text-muted-foreground">设置完成后，点击下方按钮继续注册。如果注册后无法登录，请检查密码管理器中是否有保存的通行密钥。</p>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" className="h-7 text-xs" onClick={handleAdd}>
+                已确认，继续注册
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowXiaomiGuide(false)}>
+                取消
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {passkeys.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center border rounded-xl bg-muted/5 border-dashed">
             <Fingerprint className="h-10 w-10 text-muted-foreground opacity-20 mb-3" />
@@ -441,29 +485,50 @@ function PasskeySection() {
                     <Smartphone className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-mono font-bold">{pk.id.slice(0, 12)}...</p>
+                    <p className="text-xs font-bold">{pk.name || pk.id.slice(0, 12) + "..."}</p>
                     <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 uppercase font-medium">
                       <Clock className="h-2.5 w-2.5" />{" "}
                       {new Date(pk.created_at * 1000).toLocaleDateString()} 绑定
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={async () => {
-                    if (!confirm("确定要删除此 Passkey 吗？")) return;
-                    try {
-                      await api.deletePasskey(pk.id);
-                      load();
-                    } catch (e: any) {
-                      setError(e.message || "删除失败");
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={async () => {
+                      const newName = window.prompt("重命名通行密钥", pk.name || "")?.trim();
+                      if (!newName) return;
+                      setSuccess("");
+                      try {
+                        await api.renamePasskey(pk.id, newName);
+                        load();
+                      } catch (e: any) {
+                        setError(e.message || "重命名失败");
+                      }
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={async () => {
+                      if (!confirm("确定要删除此 Passkey 吗？")) return;
+                      setSuccess("");
+                      try {
+                        await api.deletePasskey(pk.id);
+                        load();
+                      } catch (e: any) {
+                        setError(e.message || "删除失败");
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
