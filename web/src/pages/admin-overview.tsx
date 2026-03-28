@@ -537,7 +537,9 @@ function OIDCConfigCard() {
     try {
       const data = await api.getOIDCConfig();
       setProviders(data || []);
-    } catch {}
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "加载 OIDC 配置失败", description: e.message });
+    }
   }
 
   async function handleAdd() {
@@ -548,7 +550,7 @@ function OIDCConfigCard() {
         display_name: displayName.trim() || slug.trim(),
         issuer_url: issuerUrl.trim(),
         client_id: clientId.trim(),
-        client_secret: clientSecret,
+        client_secret: clientSecret.trim(),
         scopes: scopes.trim(),
       });
       setSlug("");

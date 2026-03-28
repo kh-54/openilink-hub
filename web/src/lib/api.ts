@@ -51,7 +51,12 @@ export const api = {
   login: (username: string, password: string) =>
     request("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
-  oauthProviders: () => request<{ providers: Array<{ name: string; display_name: string; type: string }> }>("/api/auth/oauth/providers"),
+  oauthProviders: () =>
+    request<{ providers: any[] }>("/api/auth/oauth/providers").then((data) => ({
+      providers: (data.providers || []).map((p: any) =>
+        typeof p === "string" ? { name: p, display_name: p, type: "oauth" } : p
+      ) as Array<{ name: string; display_name: string; type: string }>,
+    })),
   me: () =>
     request<{ id: string; username: string; display_name: string; role: string }>("/api/me"),
   info: () => request<{ ai: boolean; registration_enabled: boolean }>("/api/info"),

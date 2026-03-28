@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -101,35 +102,41 @@ func (s *Server) oidcExchangeAndIdentify(cfg *OIDCProviderConfig, redirectURI, c
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if ok && rawIDToken != "" {
 		provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
-		if err == nil {
-			verifier := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
-			idToken, err := verifier.Verify(ctx, rawIDToken)
-			if err == nil {
-				var claims struct {
-					Sub               string `json:"sub"`
-					PreferredUsername string `json:"preferred_username"`
-					Name              string `json:"name"`
-					Email             string `json:"email"`
-					Picture           string `json:"picture"`
-				}
-				if err := idToken.Claims(&claims); err == nil && claims.Sub != "" {
-					uname := claims.PreferredUsername
-					if uname == "" {
-						uname = claims.Name
-					}
-					if uname == "" {
-						uname = claims.Email
-					}
-					if uname == "" {
-						uname = claims.Sub
-					}
-					return claims.Sub, uname, claims.Email, claims.Picture, nil
-				}
-			}
+		if err != nil {
+			return "", "", "", "", fmt.Errorf("OIDC provider init failed: %w", err)
 		}
+		verifier := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+		idToken, err := verifier.Verify(ctx, rawIDToken)
+		if err != nil {
+			return "", "", "", "", fmt.Errorf("id_token verification failed: %w", err)
+		}
+		var claims struct {
+			Sub               string `json:"sub"`
+			PreferredUsername string `json:"preferred_username"`
+			Name              string `json:"name"`
+			Email             string `json:"email"`
+			Picture           string `json:"picture"`
+		}
+		if err := idToken.Claims(&claims); err != nil {
+			return "", "", "", "", fmt.Errorf("id_token claims decode failed: %w", err)
+		}
+		if claims.Sub == "" {
+			return "", "", "", "", fmt.Errorf("id_token missing sub claim")
+		}
+		uname := claims.PreferredUsername
+		if uname == "" {
+			uname = claims.Name
+		}
+		if uname == "" {
+			uname = claims.Email
+		}
+		if uname == "" {
+			uname = claims.Sub
+		}
+		return claims.Sub, uname, claims.Email, claims.Picture, nil
 	}
 
-	// Fallback: use userinfo endpoint
+	// Fallback: use userinfo endpoint (only when no id_token present)
 	if cfg.UserInfoURL != "" {
 		client := oauth2Cfg.Client(ctx, token)
 		resp, err := client.Get(cfg.UserInfoURL)
@@ -137,11 +144,18 @@ func (s *Server) oidcExchangeAndIdentify(cfg *OIDCProviderConfig, redirectURI, c
 			return "", "", "", "", fmt.Errorf("userinfo request failed: %w", err)
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", "", "", "", fmt.Errorf("userinfo endpoint returned %d", resp.StatusCode)
+		}
 		var claims map[string]any
 		if err := json.NewDecoder(resp.Body).Decode(&claims); err != nil {
 			return "", "", "", "", fmt.Errorf("userinfo decode failed: %w", err)
 		}
-		sub := fmt.Sprintf("%v", claims["sub"])
+		subVal, _ := claims["sub"]
+		if subVal == nil {
+			return "", "", "", "", fmt.Errorf("userinfo missing sub claim")
+		}
+		sub := fmt.Sprintf("%v", subVal)
 		uname, _ := claims["preferred_username"].(string)
 		if uname == "" {
 			uname, _ = claims["name"].(string)
@@ -225,8 +239,15 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request, prov
 // GET /api/admin/config/oidc — list all OIDC providers (secrets masked)
 func (s *Server) handleGetOIDCConfig(w http.ResponseWriter, r *http.Request) {
 	providers := s.oidcProviders()
-	result := make([]map[string]any, 0, len(providers))
+	// Sort by slug for stable ordering
+	sorted := make([]*OIDCProviderConfig, 0, len(providers))
 	for _, cfg := range providers {
+		sorted = append(sorted, cfg)
+	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
+
+	result := make([]map[string]any, 0, len(sorted))
+	for _, cfg := range sorted {
 		result = append(result, map[string]any{
 			"slug":          cfg.Slug,
 			"display_name":  cfg.DisplayName,
@@ -250,7 +271,7 @@ func (s *Server) handleSetOIDCConfig(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid slug (lowercase alphanumeric and hyphens only)", http.StatusBadRequest)
 		return
 	}
-	if slug == "github" || slug == "linuxdo" {
+	if knownOAuthProviders[slug] {
 		jsonError(w, "reserved slug", http.StatusBadRequest)
 		return
 	}
@@ -268,6 +289,10 @@ func (s *Server) handleSetOIDCConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.IssuerURL == "" || req.ClientID == "" {
 		jsonError(w, "issuer_url and client_id are required", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(req.IssuerURL, "https://") {
+		jsonError(w, "issuer_url must use HTTPS", http.StatusBadRequest)
 		return
 	}
 	if req.DisplayName == "" {
@@ -315,6 +340,10 @@ func (s *Server) handleSetOIDCConfig(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/admin/config/oidc/{slug} — remove an OIDC provider
 func (s *Server) handleDeleteOIDCConfig(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
+	if !slugRe.MatchString(slug) {
+		jsonError(w, "invalid slug", http.StatusBadRequest)
+		return
+	}
 	if err := s.Store.DeleteConfig("oidc." + slug + ".config"); err != nil {
 		jsonError(w, "delete failed", http.StatusInternalServerError)
 		return

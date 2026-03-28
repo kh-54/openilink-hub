@@ -59,10 +59,7 @@ export function SettingsPage() {
       ]);
       setUser(u);
       setOauthAccounts(accounts || []);
-      const providerList = (providers.providers || []).map((p: any) =>
-        typeof p === "string" ? { name: p, display_name: p, type: "oauth" } : p
-      );
-      setOauthProviders(providerList);
+      setOauthProviders(providers.providers);
     } finally {
       setLoading(false);
     }

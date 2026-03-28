@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -156,6 +157,8 @@ func (s *Server) handleOAuthProviders(w http.ResponseWriter, r *http.Request) {
 			Type:        "oidc",
 		})
 	}
+
+	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"providers": list})

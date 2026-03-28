@@ -58,13 +58,7 @@ export function LoginPage() {
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
 
   useEffect(() => {
-    api.oauthProviders().then((data) => {
-      const providers = data.providers || [];
-      // Normalize: handle both old string[] format and new object[] format
-      setOauthProviders(
-        providers.map((p: any) => typeof p === "string" ? { name: p, display_name: p, type: "oauth" } : p)
-      );
-    }).catch(() => {});
+    api.oauthProviders().then((data) => setOauthProviders(data.providers)).catch(() => {});
     api.info().then((data) => {
       if (data.registration_enabled === false) {
         setRegistrationEnabled(false);
