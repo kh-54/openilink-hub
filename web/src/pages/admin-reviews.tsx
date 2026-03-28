@@ -164,7 +164,7 @@ export function AdminReviewsPage() {
                     <ListingBadge listing={a.listing} />
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {a.owner_username} · {timeAgo(a.updated_at)}
+                    {a.owner_name} · {timeAgo(a.updated_at)}
                   </p>
                 </div>
               </button>
@@ -190,7 +190,7 @@ export function AdminReviewsPage() {
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">开发者</p>
-                  <p className="font-medium">{selected.owner_username}</p>
+                  <p className="font-medium">{selected.owner_name}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">版本</p>
