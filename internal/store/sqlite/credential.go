@@ -6,7 +6,7 @@ func (db *DB) SaveCredential(c *store.Credential) error {
 	_, err := db.Exec(
 		`INSERT INTO credentials (id, user_id, public_key, attestation_type, transport, sign_count, backup_eligible, backup_state)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT (id) DO UPDATE SET user_id = ?, public_key = ?, attestation_type = ?, transport = ?, sign_count = ?, backup_eligible = ?, backup_state = ?, created_at = unixepoch()`,
+		 ON CONFLICT (id) DO UPDATE SET user_id = ?, public_key = ?, attestation_type = ?, transport = ?, sign_count = ?, backup_eligible = ?, backup_state = ?`,
 		c.ID, c.UserID, c.PublicKey, c.AttestationType, c.Transport, c.SignCount, c.BackupEligible, c.BackupState,
 		c.UserID, c.PublicKey, c.AttestationType, c.Transport, c.SignCount, c.BackupEligible, c.BackupState,
 	)

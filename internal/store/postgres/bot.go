@@ -99,58 +99,61 @@ func (db *DB) FindBotByCredential(key, value string) (*store.Bot, error) {
 }
 
 func (db *DB) UpdateBotCredentials(id, providerID string, credentials json.RawMessage) error {
+	now := db.now()
 	_, err := db.Exec(
-		"UPDATE bots SET credentials = $1, provider_id = $2, status = 'connected', sync_state = '{}', updated_at = NOW() WHERE id = $3",
-		credentials, providerID, id)
+		"UPDATE bots SET credentials = $1, provider_id = $2, status = 'connected', sync_state = '{}', updated_at = $3 WHERE id = $4",
+		credentials, providerID, now, id)
 	if err != nil {
 		return err
 	}
-	db.Exec("UPDATE messages SET context_token = '' WHERE bot_id = $1 AND context_token != '' AND created_at > NOW() - INTERVAL '1 day'", id)
+	db.Exec("UPDATE messages SET context_token = '' WHERE bot_id = $1 AND context_token != '' AND created_at > $2 - INTERVAL '1 day'", id, now)
 	return nil
 }
 
 func (db *DB) UpdateBotName(id, name string) error {
-	_, err := db.Exec("UPDATE bots SET name = $1, updated_at = NOW() WHERE id = $2", name, id)
+	_, err := db.Exec("UPDATE bots SET name = $1, updated_at = $2 WHERE id = $3", name, db.now(), id)
 	return err
 }
 
 func (db *DB) UpdateBotDisplayName(id, displayName string) error {
-	_, err := db.Exec("UPDATE bots SET display_name = $1, updated_at = NOW() WHERE id = $2", displayName, id)
+	_, err := db.Exec("UPDATE bots SET display_name = $1, updated_at = $2 WHERE id = $3", displayName, db.now(), id)
 	return err
 }
 
 func (db *DB) UpdateBotStatus(id, status string) error {
-	_, err := db.Exec("UPDATE bots SET status = $1, updated_at = NOW() WHERE id = $2", status, id)
+	_, err := db.Exec("UPDATE bots SET status = $1, updated_at = $2 WHERE id = $3", status, db.now(), id)
 	return err
 }
 
 func (db *DB) UpdateBotSyncState(id string, syncState json.RawMessage) error {
-	_, err := db.Exec("UPDATE bots SET sync_state = $1, updated_at = NOW() WHERE id = $2", syncState, id)
+	_, err := db.Exec("UPDATE bots SET sync_state = $1, updated_at = $2 WHERE id = $3", syncState, db.now(), id)
 	return err
 }
 
 func (db *DB) IncrBotMsgCount(id string) error {
-	_, err := db.Exec("UPDATE bots SET msg_count = msg_count + 1, last_msg_at = NOW(), updated_at = NOW() WHERE id = $1", id)
+	now := db.now()
+	_, err := db.Exec("UPDATE bots SET msg_count = msg_count + 1, last_msg_at = $1, updated_at = $1 WHERE id = $2", now, id)
 	return err
 }
 
 func (db *DB) UpdateBotReminder(id string, hours int) error {
-	_, err := db.Exec("UPDATE bots SET reminder_hours = $1, updated_at = NOW() WHERE id = $2", hours, id)
+	_, err := db.Exec("UPDATE bots SET reminder_hours = $1, updated_at = $2 WHERE id = $3", hours, db.now(), id)
 	return err
 }
 
 func (db *DB) MarkBotReminded(id string) error {
-	_, err := db.Exec("UPDATE bots SET last_reminded_at = NOW() WHERE id = $1", id)
+	_, err := db.Exec("UPDATE bots SET last_reminded_at = $1 WHERE id = $2", db.now(), id)
 	return err
 }
 
 func (db *DB) GetBotsNeedingReminder() ([]store.Bot, error) {
+	now := db.now()
 	rows, err := db.Query(`SELECT `+botSelectCols+` FROM bots
 		WHERE status = 'connected'
 		AND reminder_hours > 0
 		AND last_msg_at IS NOT NULL
-		AND last_msg_at < NOW() - INTERVAL '1 hour' * reminder_hours
-		AND (last_reminded_at IS NULL OR last_reminded_at < NOW() - INTERVAL '1 hour')`)
+		AND last_msg_at < $1 - INTERVAL '1 hour' * reminder_hours
+		AND (last_reminded_at IS NULL OR last_reminded_at < $1 - INTERVAL '1 hour')`, now)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +170,12 @@ func (db *DB) GetBotsNeedingReminder() ([]store.Bot, error) {
 }
 
 func (db *DB) UpdateBotAIEnabled(id string, enabled bool) error {
-	_, err := db.Exec("UPDATE bots SET ai_enabled = $1, updated_at = NOW() WHERE id = $2", enabled, id)
+	_, err := db.Exec("UPDATE bots SET ai_enabled = $1, updated_at = $2 WHERE id = $3", enabled, db.now(), id)
 	return err
 }
 
 func (db *DB) UpdateBotAIModel(id, model string) error {
-	_, err := db.Exec("UPDATE bots SET ai_model = $1, updated_at = NOW() WHERE id = $2", model, id)
+	_, err := db.Exec("UPDATE bots SET ai_model = $1, updated_at = $2 WHERE id = $3", model, db.now(), id)
 	return err
 }
 
@@ -255,15 +258,15 @@ func (db *DB) BatchHasFreshContextToken(botIDs []string, maxAge time.Duration) m
 	secs := int(maxAge.Seconds())
 
 	placeholders := make([]string, len(botIDs))
-	args := make([]any, 0, len(botIDs)+1)
-	args = append(args, secs)
+	args := make([]any, 0, len(botIDs)+2)
+	args = append(args, db.now(), secs)
 	for i, id := range botIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+2)
+		placeholders[i] = fmt.Sprintf("$%d", i+3)
 		args = append(args, id)
 	}
 
 	rows, err := db.Query(
-		"SELECT DISTINCT bot_id FROM messages WHERE bot_id IN ("+strings.Join(placeholders, ",")+") AND context_token != '' AND created_at > NOW() - $1 * INTERVAL '1 second'",
+		"SELECT DISTINCT bot_id FROM messages WHERE bot_id IN ("+strings.Join(placeholders, ",")+") AND context_token != '' AND created_at > $1 - $2 * INTERVAL '1 second'",
 		args...,
 	)
 	if err != nil {
