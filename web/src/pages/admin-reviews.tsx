@@ -104,7 +104,8 @@ export function AdminReviewsPage() {
   // Pending apps first, then listed, then unlisted
   const sorted = [...apps].sort((a, b) => {
     const order: Record<string, number> = { pending: 0, listed: 1, unlisted: 2 };
-    return (order[a.listing] ?? 3) - (order[b.listing] ?? 3);
+    return (order[a.listing] ?? 3) - (order[b.listing] ?? 3)
+      || (b.updated_at ?? 0) - (a.updated_at ?? 0);
   });
 
   const pendingCount = apps.filter((a) => a.listing === "pending").length;
@@ -125,9 +126,9 @@ export function AdminReviewsPage() {
         </div>
       </div>
 
-      <div className="flex gap-6 min-h-[600px]">
+      <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-14rem)]">
         {/* Left: App List */}
-        <div className="w-80 shrink-0 space-y-1 overflow-y-auto">
+        <div className="md:w-80 shrink-0 space-y-1 overflow-y-auto">
           {loading ? (
             <div className="space-y-1">
               {[1, 2, 3, 4].map((i) => (
@@ -174,7 +175,7 @@ export function AdminReviewsPage() {
         {/* Right: Detail Panel */}
         <div className="flex-1 min-w-0">
           {selected ? (
-            <div className="rounded-xl border border-border/50 bg-card p-6 space-y-6 sticky top-24">
+            <div className="rounded-xl border border-border/50 bg-card p-6 space-y-6 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
               {/* Header */}
               <div className="flex items-start gap-4">
                 <AppIcon icon={selected.icon} iconUrl={selected.icon_url} size="h-12 w-12" />
