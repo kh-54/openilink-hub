@@ -93,6 +93,7 @@ export function AdminReviewsPage() {
       await api.reviewListing(a.id, true);
       toast({ title: `「${a.name}」已通过上架` });
       loadApps();
+      loadReviews(a.id);
     } catch (e: any) {
       toast({ variant: "destructive", title: "操作失败", description: e.message });
     } finally {
@@ -125,6 +126,7 @@ export function AdminReviewsPage() {
       await api.setAppListing(a.id, newListing);
       toast({ title: newListing === "listed" ? `「${a.name}」已上架` : `「${a.name}」已下架` });
       loadApps();
+      loadReviews(a.id);
     } catch (e: any) {
       toast({ variant: "destructive", title: "操作失败", description: e.message });
     } finally {
