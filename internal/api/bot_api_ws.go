@@ -107,6 +107,11 @@ func (s *Server) HandleAppWSSend(conn *app.WSConn, msg map[string]any) {
 		return
 	}
 
+	if to == "" {
+		sendErr("to is required")
+		return
+	}
+
 	if msgType == "text" && content == "" {
 		sendErr("content is required for text messages")
 		return
