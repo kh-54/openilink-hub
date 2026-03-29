@@ -401,14 +401,12 @@ function RegistryConfigCard() {
             <p className="text-sm font-medium">对外暴露 Registry</p>
             <p className="text-xs text-muted-foreground">允许其他 Hub 从此实例拉取应用</p>
           </div>
-          <Button
-            variant={registryConfig?.enabled === "true" ? "default" : "outline"}
-            size="sm"
-            onClick={handleToggleExpose}
+          <Switch
+            aria-label="对外暴露 Registry"
+            checked={registryConfig?.enabled === "true"}
+            onCheckedChange={handleToggleExpose}
             disabled={setRegistryConfigMutation.isPending}
-          >
-            {registryConfig?.enabled === "true" ? "已启用" : "已禁用"}
-          </Button>
+          />
         </div>
 
         {/* Registry Sources */}
@@ -436,14 +434,12 @@ function RegistryConfigCard() {
                   <p className="text-xs text-muted-foreground font-mono truncate">{reg.url}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    variant={reg.enabled ? "default" : "outline"}
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => handleToggleRegistry(reg)}
-                  >
-                    {reg.enabled ? "启用" : "禁用"}
-                  </Button>
+                  <Switch
+                    aria-label={`启用 ${reg.name}`}
+                    checked={reg.enabled}
+                    onCheckedChange={() => handleToggleRegistry(reg)}
+                    disabled={updateRegistryMutation.isPending}
+                  />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
