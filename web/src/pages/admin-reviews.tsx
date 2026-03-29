@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, X, Inbox, Globe, Terminal, Radio, Shield, History, ChevronDown } from "lucide-react";
+import { Check, X, Inbox, Globe, Terminal, Radio, Shield, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { AppIcon } from "@/components/app-icon";
@@ -377,65 +377,60 @@ export function AdminReviewsPage() {
                   </>
                 )}
 
-                {/* Collapsible App Details */}
+                {/* App Details — key review content */}
                 <Separator />
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-full group">
-                    <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
-                    应用详情
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-3 space-y-4">
-                    {/* Basic info */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground">开发者</p>
-                        <p className="font-medium">{selected.owner_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">更新时间</p>
-                        <p>{timeAgo(selected.updated_at)}</p>
-                      </div>
-                      {selected.homepage && (
-                        <div className="sm:col-span-2">
-                          <p className="text-xs text-muted-foreground">主页</p>
-                          <a
-                            href={selected.homepage}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline text-sm truncate block"
-                          >
-                            {selected.homepage.replace(/^https?:\/\//, "")}
-                          </a>
-                        </div>
-                      )}
+                <div className="space-y-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">应用详情</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">开发者</p>
+                      <p className="font-medium">{selected.owner_name}</p>
                     </div>
-
-                    {selected.description && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">描述</p>
-                        <p className="text-sm leading-relaxed">{selected.description}</p>
+                    <div>
+                      <p className="text-xs text-muted-foreground">更新时间</p>
+                      <p>{timeAgo(selected.updated_at)}</p>
+                    </div>
+                    {selected.homepage && (
+                      <div className="sm:col-span-2">
+                        <p className="text-xs text-muted-foreground">主页</p>
+                        <a
+                          href={selected.homepage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline text-sm truncate block"
+                        >
+                          {selected.homepage.replace(/^https?:\/\//, "")}
+                        </a>
                       </div>
                     )}
+                  </div>
 
-                    {selected.config_schema && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Config Schema</p>
-                        <pre className="text-[10px] font-mono bg-muted/40 rounded p-2 max-h-32 overflow-auto whitespace-pre-wrap">
-                          {typeof selected.config_schema === "string" ? selected.config_schema : JSON.stringify(selected.config_schema, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                  {selected.description && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">描述</p>
+                      <p className="text-sm leading-relaxed">{selected.description}</p>
+                    </div>
+                  )}
 
-                    {selected.readme && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">README</p>
-                        <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono bg-muted/40 rounded-lg p-3 max-h-60 overflow-y-auto">
-                          {selected.readme}
-                        </pre>
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
+                  {selected.config_schema && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Config Schema</p>
+                      <pre className="text-[10px] font-mono bg-muted/40 rounded p-2 max-h-32 overflow-auto whitespace-pre-wrap">
+                        {typeof selected.config_schema === "string" ? selected.config_schema : JSON.stringify(selected.config_schema, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+
+                  {selected.readme && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">README</p>
+                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono bg-muted/40 rounded-lg p-3 max-h-60 overflow-y-auto">
+                        {selected.readme}
+                      </pre>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Sticky action buttons */}
