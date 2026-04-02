@@ -14,6 +14,8 @@ import (
 
 // GET /api/marketplace — list all available apps from registries, merged with local installs
 func (s *Server) handleMarketplace(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+
 	if s.Registry == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("[]"))
@@ -33,6 +35,11 @@ func (s *Server) handleMarketplace(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		jsonError(w, "list local apps failed", http.StatusInternalServerError)
 		return
+	}
+
+	installedIDs, err := s.Store.InstalledAppIDs(userID)
+	if err != nil {
+		slog.Warn("marketplace: failed to load installed app IDs", "user_id", userID, "err", err)
 	}
 
 	// Build lookup: slug → local app
@@ -59,7 +66,7 @@ func (s *Server) handleMarketplace(w http.ResponseWriter, r *http.Request) {
 	for _, ra := range registryApps {
 		entry := marketplaceEntry{AppWithSource: ra}
 		if local, ok := localBySlug[ra.Slug]; ok {
-			entry.Installed = true
+			entry.Installed = installedIDs[local.ID]
 			entry.LocalID = local.ID
 			if ra.Version != "" && ra.Version != local.Version {
 				entry.UpdateAvailable = true

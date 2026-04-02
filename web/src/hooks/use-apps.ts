@@ -58,7 +58,7 @@ export function useCreateApp() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: any) => api.createApp(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["apps"] }),
+    onSuccess: () => invalidateAllAppQueries(qc),
   });
 }
 
@@ -66,12 +66,7 @@ export function useDeleteApp() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteApp(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["apps"] });
-      qc.invalidateQueries({ queryKey: queryKeys.marketplace.apps() });
-      qc.invalidateQueries({ queryKey: queryKeys.marketplace.builtin() });
-      qc.invalidateQueries({ queryKey: queryKeys.bots.all() });
-    },
+    onSuccess: () => invalidateAllAppQueries(qc),
   });
 }
 
@@ -81,13 +76,7 @@ export function useInstallApp() {
     mutationFn: ({ appId, data }: { appId: string; data: any }) => api.installApp(appId, data),
     onSuccess: (_data, { appId, data }) => {
       qc.invalidateQueries({ queryKey: queryKeys.apps.installations(appId) });
-      qc.invalidateQueries({ queryKey: queryKeys.bots.all() });
-      if (data?.bot_id) {
-        qc.invalidateQueries({ queryKey: queryKeys.bots.apps(data.bot_id) });
-      }
-      qc.invalidateQueries({ queryKey: queryKeys.marketplace.apps() });
-      qc.invalidateQueries({ queryKey: queryKeys.marketplace.builtin() });
-      qc.invalidateQueries({ queryKey: queryKeys.apps.all({ listing: "listed" }) });
+      invalidateAllAppQueries(qc, data?.bot_id);
     },
   });
 }
@@ -99,10 +88,7 @@ export function useUninstallApp() {
       api.deleteInstallation(appId, instId),
     onSuccess: (_data, { appId }) => {
       qc.invalidateQueries({ queryKey: queryKeys.apps.installations(appId) });
-      qc.invalidateQueries({ queryKey: queryKeys.bots.all() });
-      qc.invalidateQueries({ queryKey: queryKeys.marketplace.apps() });
-      qc.invalidateQueries({ queryKey: queryKeys.marketplace.builtin() });
-      qc.invalidateQueries({ queryKey: queryKeys.apps.all({ listing: "listed" }) });
+      invalidateAllAppQueries(qc);
     },
   });
 }

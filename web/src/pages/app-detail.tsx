@@ -25,7 +25,7 @@ import { Input } from "../components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { api, botDisplayName } from "../lib/api";
-import { useApp } from "@/hooks/use-apps";
+import { invalidateAllAppQueries, useApp } from "@/hooks/use-apps";
 import { queryKeys } from "@/lib/query-keys";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -211,9 +211,8 @@ function BasicInfoSection({ app, onUpdate, backPath }: { app: any; onUpdate: () 
     if (!ok) return;
     try {
       await api.deleteApp(app.id);
-      queryClient.invalidateQueries({ queryKey: ["apps"] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.marketplace.apps() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.marketplace.builtin() });
+      invalidateAllAppQueries(queryClient);
+      queryClient.removeQueries({ queryKey: queryKeys.apps.detail(app.id) });
       navigate(backPath);
     } catch {}
   }
@@ -504,6 +503,7 @@ function InstallAppSection({ appId }: { appId: string }) {
       toast({ title: "安装成功" });
       setHandle("");
       load();
+      invalidateAllAppQueries(queryClient, botId);
     } catch (e: any) {
       toast({ variant: "destructive", title: "安装失败", description: e.message });
     }
@@ -522,10 +522,7 @@ function InstallAppSection({ appId }: { appId: string }) {
       await api.deleteInstallation(appId, instId);
       toast({ title: "已卸载" });
       load();
-      queryClient.invalidateQueries({ queryKey: queryKeys.bots.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.marketplace.apps() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.marketplace.builtin() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.apps.all({ listing: "listed" }) });
+      invalidateAllAppQueries(queryClient);
     } catch (e: any) {
       toast({ variant: "destructive", title: "卸载失败", description: e.message });
     }

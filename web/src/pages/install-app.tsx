@@ -39,7 +39,7 @@ export function InstallAppPage() {
     qc.invalidateQueries({ queryKey: queryKeys.bots.all() });
     qc.invalidateQueries({ queryKey: queryKeys.marketplace.apps() });
     qc.invalidateQueries({ queryKey: queryKeys.marketplace.builtin() });
-    qc.invalidateQueries({ queryKey: queryKeys.apps.all({ listing: "listed" }) });
+    qc.invalidateQueries({ queryKey: ["apps"] });
   };
   const { data: app, isLoading: appLoading } = useApp(appId!);
   const { data: allBots = [] } = useBots();
@@ -144,7 +144,11 @@ export function InstallAppPage() {
       invalidateAppQueries();
       navigate(`/dashboard/accounts/${botId}/apps/${installationId}`);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "安装失败", description: e.message });
+      const description =
+        e.message === "HTTP 403" && app?.homepage
+          ? `远端应用返回了 403。请先检查该应用的接入配置，或前往应用主页联系开发者：${app.homepage}`
+          : e.message;
+      toast({ variant: "destructive", title: "安装失败", description });
     } finally {
       setInstalling(false);
     }

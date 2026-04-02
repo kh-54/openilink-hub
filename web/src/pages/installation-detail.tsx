@@ -330,7 +330,12 @@ export function InstallationDetailPage() {
             />
           )}
           {section === "event-logs" && (
-            <EventLogsSection appId={inst.app_id} instId={inst.id} botId={botId!} />
+            <EventLogsSection
+              appId={inst.app_id}
+              instId={inst.id}
+              botId={botId!}
+              homepage={app.homepage}
+            />
           )}
           {section === "api-logs" && <ApiLogsSection appId={inst.app_id} instId={inst.id} />}
         </div>
@@ -810,10 +815,12 @@ function EventLogsSection({
   appId,
   instId,
   botId,
+  homepage,
 }: {
   appId: string;
   instId: string;
   botId: string;
+  homepage?: string;
 }) {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<any[]>([]);
@@ -872,6 +879,17 @@ function EventLogsSection({
         <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30 p-3 text-xs text-muted-foreground space-y-1">
           <p className="font-medium text-orange-700 dark:text-orange-400">部分事件投递失败</p>
           <p>如果应用来自远程市场，4xx 错误通常是远程应用服务器的配置问题。请联系应用开发者确认 Webhook 地址和权限配置是否正确。</p>
+          {homepage ? (
+            <a
+              href={homepage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-orange-700 hover:underline dark:text-orange-400"
+            >
+              <ExternalLink className="h-3 w-3" />
+              前往应用主页
+            </a>
+          ) : null}
         </div>
       )}
 

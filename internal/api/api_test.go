@@ -11,6 +11,7 @@ import (
 
 	"github.com/openilink/openilink-hub/internal/auth"
 	"github.com/openilink/openilink-hub/internal/config"
+	"github.com/openilink/openilink-hub/internal/registry"
 	"github.com/openilink/openilink-hub/internal/store"
 	"github.com/openilink/openilink-hub/internal/store/sqlite"
 )
@@ -1836,4 +1837,118 @@ func TestSetBotAIModel(t *testing.T) {
 	if updated.AIModel != "" {
 		t.Errorf("expected AIModel %q, got %q", "", updated.AIModel)
 	}
+}
+
+func TestMarketplaceInstalledStatusIsPerUser(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := sqlite.Open(dbPath)
+	if err != nil {
+		t.Fatalf("sqlite.Open: %v", err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	user1, err := s.CreateUserFull("user1", "", "User One", "hashed", store.RoleMember)
+	if err != nil {
+		t.Fatalf("CreateUserFull(user1): %v", err)
+	}
+	user2, err := s.CreateUserFull("user2", "", "User Two", "hashed", store.RoleMember)
+	if err != nil {
+		t.Fatalf("CreateUserFull(user2): %v", err)
+	}
+	_ = s.UpdateUserStatus(user1.ID, store.StatusActive)
+	_ = s.UpdateUserStatus(user2.ID, store.StatusActive)
+
+	session1, err := auth.CreateSession(s, user1.ID)
+	if err != nil {
+		t.Fatalf("CreateSession(user1): %v", err)
+	}
+	session2, err := auth.CreateSession(s, user2.ID)
+	if err != nil {
+		t.Fatalf("CreateSession(user2): %v", err)
+	}
+	cookie1 := &http.Cookie{Name: "session", Value: session1}
+	cookie2 := &http.Cookie{Name: "session", Value: session2}
+
+	registryTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"version": 1,
+			"apps": []map[string]any{
+				{
+					"slug":        "remote-app",
+					"name":        "Remote App",
+					"description": "Remote app from registry",
+					"version":     "1.0.0",
+					"author":      "Registry Author",
+					"homepage":    "https://example.com/remote-app",
+					"tools":       []any{},
+					"events":      []any{},
+					"scopes":      []string{"message:write"},
+				},
+			},
+		})
+	}))
+	t.Cleanup(registryTS.Close)
+
+	reg := registry.NewClient(time.Hour)
+	reg.AddSource("Test Registry", registryTS.URL)
+
+	srv := &Server{
+		Store:       s,
+		Registry:    reg,
+		Config:      &config.Config{RPOrigin: "http://localhost"},
+		OAuthStates: newOAuthStateStore(),
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	app, err := s.CreateApp(&store.App{
+		Name:        "Remote App",
+		Slug:        "remote-app",
+		Description: "Remote app from registry",
+		Registry:    registryTS.URL,
+		Version:     "1.0.0",
+		Listing:     "listed",
+		Scopes:      json.RawMessage(`["message:write"]`),
+	})
+	if err != nil {
+		t.Fatalf("CreateApp(remote): %v", err)
+	}
+
+	bot1 := createTestBot(t, s, user1.ID, "User1 Bot")
+	if _, err := s.InstallApp(app.ID, bot1.ID); err != nil {
+		t.Fatalf("InstallApp(user1): %v", err)
+	}
+
+	assertInstalled := func(t *testing.T, cookie *http.Cookie, wantInstalled bool) {
+		t.Helper()
+		resp := doJSON(t, ts, "GET", "/api/marketplace", nil, withCookie(cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body := decodeJSON(t, resp)
+			t.Fatalf("expected 200, got %d: %v", resp.StatusCode, body)
+		}
+
+		var body []map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode marketplace response: %v", err)
+		}
+		if len(body) != 1 {
+			t.Fatalf("expected 1 marketplace app, got %d", len(body))
+		}
+
+		gotInstalled, _ := body[0]["installed"].(bool)
+		if gotInstalled != wantInstalled {
+			t.Fatalf("installed = %v, want %v; body = %+v", gotInstalled, wantInstalled, body[0])
+		}
+	}
+
+	t.Run("owner of installation sees installed", func(t *testing.T) {
+		assertInstalled(t, cookie1, true)
+	})
+
+	t.Run("other user does not inherit installed status", func(t *testing.T) {
+		assertInstalled(t, cookie2, false)
+	})
 }
