@@ -46,6 +46,12 @@ func Get(slug string) Handler {
 	return handlers[slug]
 }
 
+// Deregister removes a builtin app registration. Intended for use in tests.
+func Deregister(slug string) {
+	delete(manifests, slug)
+	delete(handlers, slug)
+}
+
 // Manifests returns all registered builtin app manifests.
 func Manifests() map[string]AppManifest {
 	return manifests
