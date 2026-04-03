@@ -402,6 +402,36 @@ func (s *Store) DeleteInstallationsByAppID(appID string) error {
 	}
 	return nil
 }
+func (s *Store) TransitionListingWithCleanup(id, currentListing, nextListing, rejectReason string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	app, ok := s.apps[id]
+	if !ok {
+		return fmt.Errorf("app %s not found", id)
+	}
+	if currentListing == "listed" && nextListing != "listed" {
+		for instID, inst := range s.installations {
+			if inst.AppID != id {
+				continue
+			}
+			delete(s.installations, instID)
+			if inst.AppToken != "" {
+				delete(s.tokenIndex, inst.AppToken)
+			}
+			if inst.Handle != "" && inst.BotID != "" {
+				delete(s.handleIndex, inst.BotID+":"+inst.Handle)
+			}
+		}
+	}
+	app.Listing = nextListing
+	if nextListing == "rejected" {
+		app.ListingRejectReason = rejectReason
+	} else {
+		app.ListingRejectReason = ""
+	}
+	return nil
+}
 func (s *Store) CreateOAuthCode(string, string, string, string, string) error { return nil }
 func (s *Store) ExchangeOAuthCode(string) (string, string, string, error) {
 	return "", "", "", errNotImplemented

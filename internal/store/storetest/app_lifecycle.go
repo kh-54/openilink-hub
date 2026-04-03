@@ -761,6 +761,41 @@ func TestAppLifecycle(t *testing.T, s store.Store) {
 		s.DeleteApp(setApp.ID)
 	})
 
+	t.Run("TransitionListingWithCleanup", func(t *testing.T) {
+		cleanupApp := mustCreateApp(t, s, u.ID, "Cleanup Test App", "cleanup-test-app")
+		if err := s.SetListing(cleanupApp.ID, "listed"); err != nil {
+			t.Fatalf("SetListing(listed): %v", err)
+		}
+		inst, err := s.InstallApp(cleanupApp.ID, b.ID)
+		if err != nil {
+			t.Fatalf("InstallApp(cleanup): %v", err)
+		}
+		if err := s.TransitionListingWithCleanup(cleanupApp.ID, "listed", "unlisted", ""); err != nil {
+			t.Fatalf("TransitionListingWithCleanup: %v", err)
+		}
+		got, err := s.GetApp(cleanupApp.ID)
+		if err != nil {
+			t.Fatalf("GetApp(cleanup): %v", err)
+		}
+		if got.Listing != "unlisted" {
+			t.Errorf("listing = %q, want %q", got.Listing, "unlisted")
+		}
+		if got.ListingRejectReason != "" {
+			t.Errorf("listing_reject_reason = %q, want empty", got.ListingRejectReason)
+		}
+		insts, err := s.ListInstallationsByApp(cleanupApp.ID)
+		if err != nil {
+			t.Fatalf("ListInstallationsByApp(cleanup): %v", err)
+		}
+		if len(insts) != 0 {
+			t.Fatalf("expected installations to be removed, got %d", len(insts))
+		}
+		if _, err := s.GetInstallation(inst.ID); err == nil {
+			t.Fatal("expected installation lookup to fail after cleanup")
+		}
+		s.DeleteApp(cleanupApp.ID)
+	})
+
 	t.Run("ListListedApps", func(t *testing.T) {
 		apps, err := s.ListListedApps()
 		if err != nil {

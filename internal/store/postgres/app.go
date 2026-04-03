@@ -408,6 +408,30 @@ func (db *DB) DeleteInstallationsByAppID(appID string) error {
 	return err
 }
 
+func (db *DB) TransitionListingWithCleanup(id, currentListing, nextListing, rejectReason string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if currentListing == "listed" && nextListing != "listed" {
+		if _, err := tx.Exec("DELETE FROM app_installations WHERE app_id = $1", id); err != nil {
+			return err
+		}
+	}
+
+	reason := ""
+	if nextListing == "rejected" {
+		reason = rejectReason
+	}
+	if _, err := tx.Exec("UPDATE apps SET listing=$1, listing_reject_reason=$2, updated_at=$3 WHERE id=$4", nextListing, reason, db.now(), id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (db *DB) CreateOAuthCode(code, appID, botID, state, codeChallenge string) error {
 	_, err := db.Exec(`INSERT INTO app_oauth_codes (code, app_id, bot_id, state, code_challenge) VALUES ($1,$2,$3,$4,$5)`,
 		code, appID, botID, state, codeChallenge)

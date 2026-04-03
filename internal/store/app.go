@@ -70,7 +70,7 @@ type AppInstallation struct {
 type AppReview struct {
 	ID        string `json:"id"`
 	AppID     string `json:"app_id"`
-	Action    string `json:"action"`    // request, approve, reject, withdraw, auto_revert, admin_set
+	Action    string `json:"action"` // request, approve, reject, withdraw, auto_revert, admin_set
 	ActorID   string `json:"actor_id"`
 	Reason    string `json:"reason"`
 	Version   string `json:"version"`
@@ -102,6 +102,7 @@ type AppStore interface {
 	GetInstallationByHandle(botID, handle string) (*AppInstallation, error)
 	DeleteInstallation(id string) error
 	DeleteInstallationsByAppID(appID string) error
+	TransitionListingWithCleanup(id, currentListing, nextListing, rejectReason string) error
 	CreateOAuthCode(code, appID, botID, state, codeChallenge string) error
 	ExchangeOAuthCode(code string) (appID, botID, codeChallenge string, err error)
 	CleanExpiredOAuthCodes()

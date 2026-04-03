@@ -64,14 +64,11 @@ func buildListingSnapshot(app *store.App) string {
 }
 
 func (s *Server) transitionAppAwayFromListed(appID, currentListing, nextListing string) error {
-	if currentListing != "listed" || nextListing == "listed" {
-		return s.Store.SetListing(appID, nextListing)
-	}
-	if err := s.Store.DeleteInstallationsByAppID(appID); err != nil {
+	if err := s.Store.TransitionListingWithCleanup(appID, currentListing, nextListing, ""); err != nil {
 		slog.Error("failed to delete installations during listing transition", "app_id", appID, "from", currentListing, "to", nextListing, "err", err)
 		return err
 	}
-	return s.Store.SetListing(appID, nextListing)
+	return nil
 }
 
 // POST /api/apps
@@ -533,18 +530,21 @@ func (s *Server) handleReviewListing(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "reason required for rejection", http.StatusBadRequest)
 		return
 	}
-	if err := s.Store.ReviewListing(appID, req.Approve, req.Reason); err != nil {
+	app, err := s.Store.GetApp(appID)
+	if err != nil {
+		jsonError(w, "app not found", http.StatusNotFound)
+		return
+	}
+	if req.Approve {
+		err = s.Store.ReviewListing(appID, true, "")
+	} else {
+		err = s.Store.TransitionListingWithCleanup(appID, app.Listing, "rejected", req.Reason)
+	}
+	if err != nil {
 		jsonError(w, "review failed", http.StatusInternalServerError)
 		return
 	}
-	if !req.Approve {
-		if err := s.Store.DeleteInstallationsByAppID(appID); err != nil {
-			slog.Error("failed to delete installations on reject", "app_id", appID, "err", err)
-			jsonError(w, "review cleanup failed", http.StatusInternalServerError)
-			return
-		}
-	}
-	app, _ := s.Store.GetApp(appID)
+	app, _ = s.Store.GetApp(appID)
 	actorID := auth.UserIDFromContext(r.Context())
 	action := "approve"
 	if !req.Approve {
