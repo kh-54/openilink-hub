@@ -97,6 +97,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/channels/status", s.handleChannelStatus)
 	mux.HandleFunc("GET /api/v1/channels/media", s.handleChannelMedia)
 
+	// --- GitHub webhook (public, token-authenticated) ---
+	mux.HandleFunc("POST /api/hooks/github", s.handleGitHubWebhook)
+
 	// --- Registry public endpoint ---
 	mux.HandleFunc("GET /api/registry/v1/apps.json", s.handleRegistryApps)
 
@@ -142,6 +145,12 @@ func (s *Server) Handler() http.Handler {
 
 	// Bot app installations
 	protected.HandleFunc("GET /api/bots/{id}/apps", s.handleListBotApps)
+
+	// Cron jobs (scheduled tasks)
+	protected.HandleFunc("GET /api/bots/{id}/cron-jobs", s.handleListCronJobs)
+	protected.HandleFunc("POST /api/bots/{id}/cron-jobs", s.handleCreateCronJob)
+	protected.HandleFunc("PUT /api/bots/{id}/cron-jobs/{jid}", s.handleUpdateCronJob)
+	protected.HandleFunc("DELETE /api/bots/{id}/cron-jobs/{jid}", s.handleDeleteCronJob)
 
 	// Channels (under bots)
 	protected.HandleFunc("GET /api/bots/{id}/channels", s.handleListChannels)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	appdelivery "github.com/openilink/openilink-hub/internal/app"
+	"github.com/openilink/openilink-hub/internal/cron"
 	"github.com/openilink/openilink-hub/internal/provider"
 	"github.com/openilink/openilink-hub/internal/push"
 	"github.com/openilink/openilink-hub/internal/relay"
@@ -83,6 +84,8 @@ func (m *Manager) StartAll(ctx context.Context) {
 
 	// Start background reminder checker
 	go m.reminderLoop(ctx)
+	// Start background cron job scheduler
+	go m.cronLoop(ctx)
 }
 
 func (m *Manager) StartBot(ctx context.Context, bot *store.Bot) error {
@@ -214,6 +217,92 @@ func (m *Manager) checkReminders() {
 			slog.Error("mark reminded failed", "bot", bot.ID, "err", err)
 		}
 		slog.Info("reminder sent", "bot", bot.ID, "hours", hours)
+	}
+}
+
+// cronLoop fires due cron jobs aligned to wall-clock minute boundaries.
+func (m *Manager) cronLoop(ctx context.Context) {
+	// Recover any jobs left with NULL next_run_at from a prior crash.
+	m.recoverStuckCronJobs()
+	// Fire immediately for any already-due jobs, then align to minute boundaries.
+	m.fireCronJobs(ctx)
+	for {
+		next := time.Now().Truncate(time.Minute).Add(time.Minute)
+		timer := time.NewTimer(time.Until(next))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+			m.fireCronJobs(ctx)
+		}
+	}
+}
+
+func (m *Manager) fireCronJobs(ctx context.Context) {
+	now := time.Now()
+	jobs, err := m.store.ClaimDueCronJobs(now.Unix())
+	if err != nil {
+		slog.Error("cron: claim due jobs failed", "err", err)
+		return
+	}
+	for _, job := range jobs {
+		inst, ok := m.GetInstance(job.BotID)
+		if !ok {
+			// Bot not running — retry on the next minute tick.
+			retryAt := now.Truncate(time.Minute).Add(time.Minute).Unix()
+			m.store.SetCronJobNextRun(job.ID, &retryAt)
+			continue
+		}
+
+		// Only use context token when no explicit recipient is set,
+		// to avoid sending in the wrong conversation thread.
+		msg := provider.OutboundMessage{
+			Text:      job.Message,
+			Recipient: job.Recipient,
+		}
+		if job.Recipient == "" {
+			msg.ContextToken = m.store.GetLatestContextToken(job.BotID)
+		}
+
+		sendCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		_, err := inst.Send(sendCtx, msg)
+		cancel()
+		if err != nil {
+			slog.Error("cron: send failed", "job", job.ID, "bot", job.BotID, "err", err)
+			// Retry on the next minute tick.
+			retryAt := now.Truncate(time.Minute).Add(time.Minute).Unix()
+			m.store.SetCronJobNextRun(job.ID, &retryAt)
+			continue
+		}
+		slog.Info("cron: job fired", "job", job.ID, "name", job.Name, "bot", job.BotID)
+
+		// Mark as run and advance to next occurrence.
+		var nextRunAt *int64
+		if next, err := cron.NextAfter(job.CronExpr, now); err == nil {
+			v := next.Unix()
+			nextRunAt = &v
+		}
+		if err := m.store.MarkCronJobRun(job.ID, now.Unix(), nextRunAt); err != nil {
+			slog.Error("cron: mark run failed", "job", job.ID, "err", err)
+		}
+	}
+}
+
+// recoverStuckCronJobs fixes enabled jobs with NULL next_run_at (e.g. after a crash mid-claim).
+func (m *Manager) recoverStuckCronJobs() {
+	jobs, err := m.store.ListStuckCronJobs()
+	if err != nil {
+		slog.Error("cron: list stuck jobs failed", "err", err)
+		return
+	}
+	now := time.Now()
+	for _, job := range jobs {
+		if next, err := cron.NextAfter(job.CronExpr, now); err == nil {
+			v := next.Unix()
+			m.store.SetCronJobNextRun(job.ID, &v)
+			slog.Info("cron: recovered stuck job", "job", job.ID, "next", next)
+		}
 	}
 }
 
