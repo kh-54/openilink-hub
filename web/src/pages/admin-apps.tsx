@@ -15,6 +15,18 @@ import {
   useDeleteAdminApp,
 } from "@/hooks/use-admin";
 
+export function AdminAppsPage() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">应用管理</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">管理应用上架、审核与配置。</p>
+      </div>
+      <AdminAppsTab />
+    </div>
+  );
+}
+
 export function AdminAppsTab() {
   const queryClient = useQueryClient();
   const { data: apps = [] } = useAdminApps();

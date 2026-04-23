@@ -438,6 +438,15 @@ export function Layout() {
                         <SidebarMenuSubButton
                           asChild
                           size="sm"
+                          isActive={isActive("/dashboard/admin/apps")}
+                        >
+                          <Link to="/dashboard/admin/apps">应用管理</Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          asChild
+                          size="sm"
                           isActive={isActive("/dashboard/admin/reviews")}
                         >
                           <Link to="/dashboard/admin/reviews">审核中心</Link>
