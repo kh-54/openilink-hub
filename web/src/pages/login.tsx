@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, Shield, User, Lock, ArrowRight, Loader2, Github, X, QrCode, ChevronDown } from "lucide-react";
+import {
+  KeyRound,
+  Shield,
+  User,
+  Lock,
+  ArrowRight,
+  Loader2,
+  Github,
+  X,
+  QrCode,
+  ChevronDown,
+} from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import QRCode from "qrcode";
 
@@ -11,20 +22,16 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter
+  CardFooter,
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { api } from "../lib/api";
 import { Separator } from "../components/ui/separator";
 import { useOAuthProviders } from "@/hooks/use-settings";
 import { useInfo } from "@/hooks/use-auth";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const providerLabels: Record<string, { label: string, icon: any }> = {
+const providerLabels: Record<string, { label: string; icon: any }> = {
   github: { label: "GitHub", icon: Github },
   linuxdo: { label: "LinuxDo", icon: Shield },
 };
@@ -42,7 +49,9 @@ export function LoginPage() {
 
   // Scan login state
   const [qrUrl, setQrUrl] = useState("");
-  const [scanStatus, setScanStatus] = useState<"idle" | "loading" | "wait" | "scanned" | "error">("idle");
+  const [scanStatus, setScanStatus] = useState<"idle" | "loading" | "wait" | "scanned" | "error">(
+    "idle",
+  );
   const [scanMessage, setScanMessage] = useState("");
   const scanWsRef = useRef<WebSocket | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,7 +113,9 @@ export function LoginPage() {
   function connectScanWS(sessionID: string, retries = 0) {
     const MAX_RETRIES = 5;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/auth/scan/status/${sessionID}`);
+    const ws = new WebSocket(
+      `${protocol}//${window.location.host}/api/auth/scan/status/${sessionID}`,
+    );
     scanWsRef.current = ws;
     let settled = false;
 
@@ -123,10 +134,12 @@ export function LoginPage() {
         } else if (d.status === "connected") {
           settled = true;
           if (d.session_token) {
-            document.cookie = `session=${d.session_token}; path=/; max-age=${7*24*3600}; samesite=lax`;
+            document.cookie = `session=${d.session_token}; path=/; max-age=${7 * 24 * 3600}; samesite=lax`;
           }
           ws.close();
-          navigate(d.is_new && d.bot_id ? `/dashboard/onboarding?bot_id=${d.bot_id}` : "/dashboard");
+          navigate(
+            d.is_new && d.bot_id ? `/dashboard/onboarding?bot_id=${d.bot_id}` : "/dashboard",
+          );
         }
       } else if (d.event === "error") {
         settled = true;
@@ -135,7 +148,9 @@ export function LoginPage() {
         ws.close();
       }
     };
-    ws.onerror = () => { ws.close(); };
+    ws.onerror = () => {
+      ws.close();
+    };
     ws.onclose = () => {
       if (settled) return;
       if (retries < MAX_RETRIES) {
@@ -185,7 +200,8 @@ export function LoginPage() {
   }
 
   async function handlePasskeyLogin() {
-    setError(""); setLoading(true);
+    setError("");
+    setLoading(true);
     try {
       const options = await fetch("/api/auth/passkey/login/begin", {
         method: "POST",
@@ -245,10 +261,8 @@ export function LoginPage() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 mb-4">
             <Shield className="h-6 w-6" />
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight">OpeniLink Hub</h1>
-          <p className="text-sm text-muted-foreground font-medium">
-            微信扫码，一键登录
-          </p>
+          <h1 className="text-3xl font-extrabold tracking-tight">WeChat</h1>
+          <p className="text-sm text-muted-foreground font-medium">微信扫码，一键登录</p>
         </div>
 
         <Card className="border-border/50 shadow-2xl backdrop-blur-md bg-card/80">
@@ -267,7 +281,9 @@ export function LoginPage() {
                       <div className="text-center space-y-3 px-4">
                         <X className="h-8 w-8 text-destructive mx-auto" />
                         <p className="text-xs text-muted-foreground">{scanMessage}</p>
-                        <Button size="sm" variant="outline" onClick={startScanLogin}>重新获取</Button>
+                        <Button size="sm" variant="outline" onClick={startScanLogin}>
+                          重新获取
+                        </Button>
                       </div>
                     ) : (
                       <Loader2 className="h-10 w-10 animate-spin text-primary/40" />
@@ -291,12 +307,13 @@ export function LoginPage() {
                         : "打开微信，扫描二维码即可登录。仅限已绑定的微信账号。"}
                 </p>
               </div>
-
             </div>
 
             {/* Divider */}
             <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center"><Separator /></div>
+              <div className="absolute inset-0 flex items-center">
+                <Separator />
+              </div>
               <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest text-muted-foreground">
                 <span className="bg-card px-3">其他登录方式</span>
               </div>
@@ -306,13 +323,21 @@ export function LoginPage() {
             {oauthProviders.length > 0 && (
               <div className="space-y-2 mb-4">
                 {oauthProviders.map((provider) => {
-                  const config = providerLabels[provider.name] || { label: provider.display_name || provider.name, icon: Shield };
+                  const config = providerLabels[provider.name] || {
+                    label: provider.display_name || provider.name,
+                    icon: Shield,
+                  };
                   return (
                     <Button
                       key={provider.name}
                       variant="outline"
                       className="w-full h-9 gap-2 font-medium text-sm"
-                      onClick={() => (window.location.href = provider.type === "oidc" ? `/api/auth/oidc/${provider.name}` : `/api/auth/oauth/${provider.name}`)}
+                      onClick={() =>
+                        (window.location.href =
+                          provider.type === "oidc"
+                            ? `/api/auth/oidc/${provider.name}`
+                            : `/api/auth/oauth/${provider.name}`)
+                      }
                     >
                       <config.icon className="h-4 w-4" />
                       使用 {config.label} 登录
@@ -340,8 +365,16 @@ export function LoginPage() {
             <Collapsible open={showPassword} onOpenChange={setShowPassword}>
               <CollapsibleTrigger asChild>
                 <button className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
-                  <span>{mode === "login" ? "账号密码登录" : registrationEnabled ? "注册新账号" : "账号密码登录"}</span>
-                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showPassword ? "rotate-180" : ""}`} />
+                  <span>
+                    {mode === "login"
+                      ? "账号密码登录"
+                      : registrationEnabled
+                        ? "注册新账号"
+                        : "账号密码登录"}
+                  </span>
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform duration-200 ${showPassword ? "rotate-180" : ""}`}
+                  />
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
@@ -390,7 +423,10 @@ export function LoginPage() {
                     <button
                       type="button"
                       className="ml-1 font-bold text-primary hover:underline"
-                      onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
+                      onClick={() => {
+                        setMode(mode === "login" ? "register" : "login");
+                        setError("");
+                      }}
                     >
                       {mode === "login" ? "立即注册" : "点击登录"}
                     </button>
@@ -401,13 +437,21 @@ export function LoginPage() {
           </CardContent>
           <CardFooter className="border-t bg-muted/30 pt-4 pb-4 rounded-b-xl justify-center">
             <p className="text-[10px] text-center text-muted-foreground/60 leading-relaxed px-6">
-              登录即代表您同意我们的 <Link to="#" className="underline">服务条款</Link> 和 <Link to="#" className="underline">隐私政策</Link>。
+              登录即代表您同意我们的{" "}
+              <Link to="#" className="underline">
+                服务条款
+              </Link>{" "}
+              和{" "}
+              <Link to="#" className="underline">
+                隐私政策
+              </Link>
+              。
             </p>
           </CardFooter>
         </Card>
 
         <footer className="mt-8 text-center text-[11px] text-muted-foreground/50 font-medium">
-          &copy; 2026 OpeniLink Hub 项目保留所有权利。
+          &copy; 2026 WeChat 项目保留所有权利。
         </footer>
       </div>
     </div>

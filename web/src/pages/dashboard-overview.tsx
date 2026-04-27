@@ -220,7 +220,7 @@ export function DashboardOverviewPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base font-semibold">快速开始</CardTitle>
-                <CardDescription className="text-xs mt-0.5">三步开始使用 OpeniLink</CardDescription>
+                <CardDescription className="text-xs mt-0.5">三步开始使用 WeChat</CardDescription>
               </div>
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                 <TrendingUp className="h-4 w-4" />

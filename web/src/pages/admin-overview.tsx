@@ -191,21 +191,27 @@ export function AdminOverviewPage() {
 
               <TabsContent value="basic" className="space-y-4 mt-0">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">接口地址</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
+                    接口地址
+                  </Label>
                   <Input
                     value={effectiveAIConfig?.base_url || ""}
                     onChange={(e) => updateAIConfig({ base_url: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">默认模型</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
+                    默认模型
+                  </Label>
                   <Input
                     value={effectiveAIConfig?.model || ""}
                     onChange={(e) => updateAIConfig({ model: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">API Key</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
+                    API Key
+                  </Label>
                   <Input
                     type="password"
                     value={effectiveAIConfig?.api_key || ""}
@@ -214,7 +220,9 @@ export function AdminOverviewPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">系统提示词</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
+                    系统提示词
+                  </Label>
                   <Textarea
                     rows={4}
                     value={effectiveAIConfig?.system_prompt || ""}
@@ -224,7 +232,9 @@ export function AdminOverviewPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">历史消息轮数</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">
+                    历史消息轮数
+                  </Label>
                   <Input
                     type="number"
                     min={0}
@@ -232,7 +242,9 @@ export function AdminOverviewPage() {
                     onChange={(e) => updateAIConfig({ max_history: e.target.value })}
                     placeholder="默认 20 轮"
                   />
-                  <p className="text-xs text-muted-foreground">AI 对话时携带的历史消息轮数，0 表示不携带历史。</p>
+                  <p className="text-xs text-muted-foreground">
+                    AI 对话时携带的历史消息轮数，0 表示不携带历史。
+                  </p>
                 </div>
               </TabsContent>
 
@@ -246,7 +258,8 @@ export function AdminOverviewPage() {
                     try {
                       if (effectiveAIConfig?.available_models) {
                         const parsed = JSON.parse(effectiveAIConfig.available_models);
-                        if (Array.isArray(parsed)) models = parsed.filter((s: unknown) => typeof s === "string");
+                        if (Array.isArray(parsed))
+                          models = parsed.filter((s: unknown) => typeof s === "string");
                       }
                     } catch {}
 
@@ -368,7 +381,9 @@ export function AdminOverviewPage() {
                 <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50">
                   <div>
                     <p className="text-sm font-medium">隐藏思考过程</p>
-                    <p className="text-xs text-muted-foreground">启用后不会将模型的思考内容发送给用户</p>
+                    <p className="text-xs text-muted-foreground">
+                      启用后不会将模型的思考内容发送给用户
+                    </p>
                   </div>
                   <Switch
                     checked={effectiveAIConfig?.hide_thinking === "true"}
@@ -380,7 +395,9 @@ export function AdminOverviewPage() {
                 <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50">
                   <div>
                     <p className="text-sm font-medium">Markdown 转纯文本</p>
-                    <p className="text-xs text-muted-foreground">启用后将 AI 回复中的 Markdown 格式转为纯文本</p>
+                    <p className="text-xs text-muted-foreground">
+                      启用后将 AI 回复中的 Markdown 格式转为纯文本
+                    </p>
                   </div>
                   <Switch
                     checked={effectiveAIConfig?.strip_markdown === "true"}
@@ -491,7 +508,10 @@ function RegistryConfigCard() {
 
   async function handleImportDefault() {
     try {
-      await createRegistryMutation.mutateAsync({ name: "OpeniLink Hub", url: "https://hub.openilink.com" });
+      await createRegistryMutation.mutateAsync({
+        name: "WeChat",
+        url: "https://hub.openilink.com",
+      });
       toast({ title: "已添加官方 Registry" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "添加失败", description: e.message });
@@ -723,7 +743,8 @@ function OIDCConfigCard() {
       <CardHeader>
         <CardTitle>OIDC 身份提供商</CardTitle>
         <CardDescription>
-          添加自定义 OIDC 身份提供商（如 Pocket-ID、Keycloak、Authentik 等），用户可通过这些服务登录。
+          添加自定义 OIDC 身份提供商（如 Pocket-ID、Keycloak、Authentik
+          等），用户可通过这些服务登录。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -731,16 +752,15 @@ function OIDCConfigCard() {
         {providers.length > 0 && (
           <div className="space-y-2">
             {providers.map((p: any) => (
-              <div
-                key={p.slug}
-                className="space-y-1.5 p-3 rounded-lg border bg-background"
-              >
+              <div key={p.slug} className="space-y-1.5 p-3 rounded-lg border bg-background">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex items-center gap-3">
                     <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{p.display_name}</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">{p.issuer_url}</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {p.issuer_url}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -853,7 +873,13 @@ function OIDCConfigCard() {
             onClick={handleSave}
             disabled={saving || !slug.trim() || !issuerUrl.trim() || !clientId.trim()}
           >
-            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : isEditing ? <Check className="w-3.5 h-3.5 mr-1" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+            {saving ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : isEditing ? (
+              <Check className="w-3.5 h-3.5 mr-1" />
+            ) : (
+              <Plus className="w-3.5 h-3.5 mr-1" />
+            )}
             {isEditing ? "保存" : "添加"}
           </Button>
         </div>
