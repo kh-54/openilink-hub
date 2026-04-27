@@ -192,6 +192,29 @@ func (s *Server) completeScanLogin(result *provider.BindPollResult, sendEvent fu
 		sendEvent("error", `{"message":"account disabled"}`)
 		return
 	}
+	// Bootstrap safety: if there is no admin account yet, promote the
+	// current scan-login user so they can access the management panel.
+	// This guarantees the first successful scan user can manage listings.
+	users, err := s.Store.ListUsers()
+	if err == nil {
+		hasAdmin := false
+		for _, u := range users {
+			if store.IsAdmin(u.Role) {
+				hasAdmin = true
+				break
+			}
+		}
+		if !hasAdmin {
+			if err := s.Store.UpdateUserRole(user.ID, store.RoleSuperAdmin); err != nil {
+				slog.Error("scan-login bootstrap promote failed", "user", user.ID, "err", err)
+			} else {
+				user.Role = store.RoleSuperAdmin
+				slog.Info("scan-login bootstrap promoted user to superadmin", "user", user.ID)
+			}
+		}
+	} else {
+		slog.Warn("scan-login list users failed for bootstrap check", "err", err)
+	}
 
 	// Create new bot if not rebinding
 	isNew := bot == nil
