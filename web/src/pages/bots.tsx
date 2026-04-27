@@ -107,7 +107,9 @@ export function BotsPage() {
         }
       }
     };
-    ws.onerror = () => { ws.close(); };
+    ws.onerror = () => {
+      ws.close();
+    };
     ws.onclose = () => {
       if (settled) return;
       if (retries < MAX_RETRIES) {
@@ -184,11 +186,7 @@ export function BotsPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {bots.map((bot) => (
-            <BotInstanceCard
-              key={bot.id}
-              bot={bot}
-              onRebind={() => setBinding(true)}
-            />
+            <BotInstanceCard key={bot.id} bot={bot} onRebind={() => setBinding(true)} />
           ))}
 
           {bots.length === 0 ? (
@@ -224,13 +222,7 @@ function QrCanvas({ url }: { url: string }) {
   return <canvas ref={ref} className="block rounded-lg" />;
 }
 
-function BotInstanceCard({
-  bot,
-  onRebind,
-}: {
-  bot: any;
-  onRebind: () => void;
-}) {
+function BotInstanceCard({ bot, onRebind }: { bot: any; onRebind: () => void }) {
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
   const deleteMutation = useDeleteBot();
@@ -249,12 +241,14 @@ function BotInstanceCard({
       if (!ok) return;
       deleteMutation.mutate(bot.id, {
         onSuccess: () => toast({ title: "已删除账号" }),
-        onError: (e) => toast({ variant: "destructive", title: "操作失败", description: e.message }),
+        onError: (e) =>
+          toast({ variant: "destructive", title: "操作失败", description: e.message }),
       });
     } else if (action === "reconnect") {
       reconnectMutation.mutate(bot.id, {
         onSuccess: () => toast({ title: "指令已发出", description: "正在尝试重新建立连接..." }),
-        onError: (e) => toast({ variant: "destructive", title: "操作失败", description: e.message }),
+        onError: (e) =>
+          toast({ variant: "destructive", title: "操作失败", description: e.message }),
       });
     }
   }
@@ -353,8 +347,8 @@ function BotInstanceCard({
       <div className="mx-5 mb-5 pt-3 border-t border-border/40 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
           <Cpu className="h-3 w-3 shrink-0" />
-          <span className="capitalize">{bot.provider || "未知"}</span>
-          <span className="mx-0.5 opacity-40">·</span>
+          {/* <span className="capitalize">{bot.provider || "未知"}</span> */}
+          {/* <span className="mx-0.5 opacity-40">·</span> */}
           <span className="font-mono">{bot.id.slice(0, 8)}</span>
         </div>
         <Link

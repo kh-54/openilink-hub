@@ -73,7 +73,10 @@ export function AppDetailPage() {
   // Convenience: invalidate app detail cache after mutations
   const refreshApp = () => queryClient.invalidateQueries({ queryKey: queryKeys.apps.detail(id!) });
 
-  if (isError) { navigate(backPath); return null; }
+  if (isError) {
+    navigate(backPath);
+    return null;
+  }
   if (!app) return null;
 
   return (
@@ -98,6 +101,10 @@ export function AppDetailPage() {
         {app.registry && <Badge variant="outline">来自应用市场</Badge>}
         {app.listing === "listed" ? (
           <Badge variant="default">已上架</Badge>
+        ) : app.listing === "listed_readonly" ? (
+          <Badge variant="outline" className="text-amber-600 border-amber-500">
+            仅展示
+          </Badge>
         ) : app.listing === "pending" ? (
           <Badge variant="outline">审核中</Badge>
         ) : app.listing === "rejected" ? (
@@ -150,9 +157,14 @@ export function AppDetailPage() {
 
         <div className="flex-1 min-w-0">
           {section === "basic-info" && (
-            <BasicInfoSection key={app.updated_at} app={app} onUpdate={refreshApp} backPath={backPath} />
+            <BasicInfoSection
+              key={app.updated_at}
+              app={app}
+              onUpdate={refreshApp}
+              backPath={backPath}
+            />
           )}
-          {section === "install-app" && <InstallAppSection appId={id!} />}
+          {section === "install-app" && <InstallAppSection appId={id!} app={app} />}
           {section === "distribution" && <DistributionSection app={app} onUpdate={refreshApp} />}
           {section === "event-subscriptions" && (
             <EventSubscriptionsSection app={app} onUpdate={refreshApp} />
@@ -169,7 +181,15 @@ export function AppDetailPage() {
 
 // ==================== Basic Information (merged Settings + Credentials) ====================
 
-function BasicInfoSection({ app, onUpdate, backPath }: { app: any; onUpdate: () => void; backPath: string }) {
+function BasicInfoSection({
+  app,
+  onUpdate,
+  backPath,
+}: {
+  app: any;
+  onUpdate: () => void;
+  backPath: string;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -338,11 +358,11 @@ function BasicInfoSection({ app, onUpdate, backPath }: { app: any; onUpdate: () 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-xs font-mono text-muted-foreground">
-            <p className="font-sans text-xs font-medium text-foreground">HTTP 发消息</p>
+            <p className="font-sans text-xs font-medium text-foreground">发消息</p>
             <pre className="p-2 rounded-md bg-muted/30 border overflow-x-auto whitespace-pre-wrap">{`curl -X POST ${window.location.origin}/bot/v1/message/send \\
   -H "Authorization: Bearer <your_token>" \\
   -d '{"content":"hello"}'`}</pre>
-            <p className="font-sans text-xs font-medium text-foreground">WebSocket 连接</p>
+            <p className="font-sans text-xs font-medium text-foreground">连接</p>
             <pre className="p-2 rounded-md bg-muted/30 border overflow-x-auto whitespace-pre-wrap">{`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/bot/v1/ws?token=<your_token>`}</pre>
           </CardContent>
         </Card>
@@ -428,7 +448,11 @@ function SecretField({
 
   function handleCopy() {
     if (!navigator.clipboard?.writeText) {
-      toast({ variant: "destructive", title: "复制失败", description: "当前浏览器不支持自动复制，请手动选中复制" });
+      toast({
+        variant: "destructive",
+        title: "复制失败",
+        description: "当前浏览器不支持自动复制，请手动选中复制",
+      });
       return;
     }
     navigator.clipboard
@@ -470,7 +494,7 @@ function SecretField({
 
 // ==================== Install App ====================
 
-function InstallAppSection({ appId }: { appId: string }) {
+function InstallAppSection({ appId, app }: { appId: string; app: any }) {
   const [installations, setInstallations] = useState<any[]>([]);
   const [bots, setBots] = useState<any[]>([]);
   const [botId, setBotId] = useState("");
@@ -497,6 +521,14 @@ function InstallAppSection({ appId }: { appId: string }) {
 
   async function handleInstall() {
     if (!botId || !handle.trim()) return;
+    if (app?.listing === "listed" || app?.listing === "listed_readonly") {
+      toast({
+        variant: "destructive",
+        title: "无权限",
+        description: `应用「${app.name}」不允许安装`,
+      });
+      return;
+    }
     setInstalling(true);
     try {
       await api.installApp(appId!, { bot_id: botId, handle: handle.trim() });
@@ -659,7 +691,10 @@ function DistributionSection({ app, onUpdate }: { app: any; onUpdate: () => void
   const { toast } = useToast();
 
   useEffect(() => {
-    api.listAppReviews(app.id).then(setReviews).catch(() => {});
+    api
+      .listAppReviews(app.id)
+      .then(setReviews)
+      .catch(() => {});
   }, [app.id]);
 
   async function handleRequestListing() {
@@ -667,7 +702,10 @@ function DistributionSection({ app, onUpdate }: { app: any; onUpdate: () => void
     try {
       await api.requestListing(app.id);
       onUpdate();
-      api.listAppReviews(app.id).then(setReviews).catch(() => {});
+      api
+        .listAppReviews(app.id)
+        .then(setReviews)
+        .catch(() => {});
     } catch (e: any) {
       toast({ variant: "destructive", title: "提交审核失败", description: e.message });
     }
@@ -692,6 +730,15 @@ function DistributionSection({ app, onUpdate }: { app: any; onUpdate: () => void
             <div className="flex items-center gap-2">
               <Badge variant="default">已上架</Badge>
               <span className="text-xs text-muted-foreground">你的应用已在应用市场中展示。</span>
+            </div>
+          ) : app.listing === "listed_readonly" ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-amber-600 border-amber-500">
+                仅展示
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                你的应用在应用市场可见，但用户不可安装。
+              </span>
             </div>
           ) : app.listing === "pending" ? (
             <div className="space-y-2">
@@ -914,7 +961,11 @@ function ToolsEditor({ app, onUpdate }: { app: any; onUpdate: () => void }) {
       }
       const result = await api.importMCP({ url: mcpUrl.trim(), headers });
       if (result.tools.length === 0) {
-        toast({ variant: "destructive", title: "未发现工具", description: "MCP 服务器未返回任何工具定义" });
+        toast({
+          variant: "destructive",
+          title: "未发现工具",
+          description: "MCP 服务器未返回任何工具定义",
+        });
       } else {
         if (tools.length > 0) {
           const ok = await confirm({
@@ -922,7 +973,10 @@ function ToolsEditor({ app, onUpdate }: { app: any; onUpdate: () => void }) {
             description: `将从 MCP 服务器导入 ${result.tools.length} 个工具，替换当前全部 ${tools.length} 个工具。确定继续？`,
             confirmText: "替换",
           });
-          if (!ok) { setImporting(false); return; }
+          if (!ok) {
+            setImporting(false);
+            return;
+          }
         }
         const imported = result.tools.map((t) => ({
           name: t.name,
@@ -990,7 +1044,8 @@ function ToolsEditor({ app, onUpdate }: { app: any; onUpdate: () => void }) {
           <CardHeader>
             <CardTitle>从 MCP 服务器导入</CardTitle>
             <CardDescription>
-              输入 MCP 服务器的 Streamable HTTP 地址，自动发现并导入工具定义。导入会替换当前所有工具。
+              输入 MCP 服务器的 Streamable HTTP
+              地址，自动发现并导入工具定义。导入会替换当前所有工具。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

@@ -132,7 +132,7 @@ export function DashboardOverviewPage() {
             link: null,
           },
           {
-            label: "WebSocket 连接",
+            label: "连接",
             value: stats?.connected_ws ?? 0,
             sub: "活跃连接",
             icon: Wifi,

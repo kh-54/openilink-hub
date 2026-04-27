@@ -187,6 +187,15 @@ function InstallDialog({
 
   async function doInstall() {
     if (!confirmApp) return;
+    if (confirmApp.listing === "listed" || confirmApp.listing === "listed_readonly") {
+      setError("无权限：该应用不允许安装");
+      toast({
+        variant: "destructive",
+        title: "无权限",
+        description: `应用「${confirmApp.name}」不允许安装`,
+      });
+      return;
+    }
     setInstalling(true);
     setError("");
     try {
@@ -387,6 +396,14 @@ function InstallDialog({
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium">{app.name}</span>
+                        {(app.listing === "listed" || app.listing === "listed_readonly") && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] text-amber-600 border-amber-500"
+                          >
+                            仅展示
+                          </Badge>
+                        )}
                       </div>
                       {app.description ? (
                         <p className="text-xs text-muted-foreground truncate">{app.description}</p>

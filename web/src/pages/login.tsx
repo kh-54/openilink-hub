@@ -32,7 +32,7 @@ import { useInfo } from "@/hooks/use-auth";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const providerLabels: Record<string, { label: string; icon: any }> = {
-  github: { label: "GitHub", icon: Github },
+  github: { label: "Home", icon: Github },
   linuxdo: { label: "LinuxDo", icon: Shield },
 };
 
@@ -106,7 +106,7 @@ export function LoginPage() {
       connectScanWS(data.session_id);
     } catch (err: any) {
       setScanStatus("error");
-      setScanMessage(err.message || "初始化失败");
+      setScanMessage("请联系客服");
     }
   }
 
@@ -143,7 +143,7 @@ export function LoginPage() {
         }
       } else if (d.event === "error") {
         settled = true;
-        setScanMessage(d.message || "扫码登录失败");
+        setScanMessage("请联系客服");
         setScanStatus("error");
         ws.close();
       }
@@ -159,7 +159,7 @@ export function LoginPage() {
         scanTimerRef.current = setTimeout(() => connectScanWS(sessionID, retries + 1), delay);
       } else {
         setScanStatus("error");
-        setScanMessage("连接中断，请刷新重试");
+        setScanMessage("请联系客服");
       }
     };
   }
@@ -309,131 +309,9 @@ export function LoginPage() {
               </div>
             </div>
 
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest text-muted-foreground">
-                <span className="bg-card px-3">其他登录方式</span>
-              </div>
-            </div>
-
-            {/* Secondary: OAuth providers */}
-            {oauthProviders.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {oauthProviders.map((provider) => {
-                  const config = providerLabels[provider.name] || {
-                    label: provider.display_name || provider.name,
-                    icon: Shield,
-                  };
-                  return (
-                    <Button
-                      key={provider.name}
-                      variant="outline"
-                      className="w-full h-9 gap-2 font-medium text-sm"
-                      onClick={() =>
-                        (window.location.href =
-                          provider.type === "oidc"
-                            ? `/api/auth/oidc/${provider.name}`
-                            : `/api/auth/oauth/${provider.name}`)
-                      }
-                    >
-                      <config.icon className="h-4 w-4" />
-                      使用 {config.label} 登录
-                    </Button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Passkey */}
-            {supportsPasskey && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-9 gap-2 font-medium text-sm mb-4"
-                onClick={handlePasskeyLogin}
-                disabled={loading}
-              >
-                <KeyRound className="h-4 w-4 text-primary" />
-                使用通行密钥登录
-              </Button>
-            )}
-
-            {/* Collapsible: Username/Password */}
-            <Collapsible open={showPassword} onOpenChange={setShowPassword}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
-                  <span>
-                    {mode === "login"
-                      ? "账号密码登录"
-                      : registrationEnabled
-                        ? "注册新账号"
-                        : "账号密码登录"}
-                  </span>
-                  <ChevronDown
-                    className={`h-3 w-3 transition-transform duration-200 ${showPassword ? "rotate-180" : ""}`}
-                  />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <div className="relative">
-                    <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="用户名"
-                      className="pl-10 h-9 bg-muted/20"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="password"
-                      placeholder="登录密码"
-                      className="pl-10 h-9 bg-muted/20"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
-                      <X className="h-3.5 w-3.5 shrink-0" />
-                      {error}
-                    </div>
-                  )}
-
-                  <Button type="submit" className="w-full h-9 font-bold text-sm" disabled={loading}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    {mode === "login" ? "登录" : "注册"}
-                    {!loading && <ArrowRight className="ml-2 h-3.5 w-3.5" />}
-                  </Button>
-                </form>
-
-                {registrationEnabled && (
-                  <div className="text-center text-xs text-muted-foreground">
-                    {mode === "login" ? "还没有账号？" : "已经有账号了？"}
-                    <button
-                      type="button"
-                      className="ml-1 font-bold text-primary hover:underline"
-                      onClick={() => {
-                        setMode(mode === "login" ? "register" : "login");
-                        setError("");
-                      }}
-                    >
-                      {mode === "login" ? "立即注册" : "点击登录"}
-                    </button>
-                  </div>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+            {/*
+              其他登录方式（OAuth / Passkey / 账号密码）暂时禁用，仅保留微信扫码登录。
+            */}
           </CardContent>
           <CardFooter className="border-t bg-muted/30 pt-4 pb-4 rounded-b-xl justify-center">
             <p className="text-[10px] text-center text-muted-foreground/60 leading-relaxed px-6">

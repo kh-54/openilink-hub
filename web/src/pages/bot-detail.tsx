@@ -147,6 +147,14 @@ export function BotDetailPage() {
   };
 
   const handleInstallApp = async (app: any) => {
+    if (app.listing === "listed" || app.listing === "listed_readonly") {
+      toast({
+        variant: "destructive",
+        title: "无权限",
+        description: `应用「${app.name}」不允许安装`,
+      });
+      return;
+    }
     if (app.local_id) {
       navigate(`/dashboard/accounts/${id}/install/${app.local_id}`);
       return;
@@ -261,8 +269,8 @@ export function BotDetailPage() {
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Cpu className="h-3 w-3" />
-              <span className="capitalize">{bot.provider}</span>
-              <span className="opacity-40">·</span>
+              {/* <span className="capitalize">{bot.provider}</span> */}
+              {/* <span className="opacity-40">·</span> */}
               <span className="font-mono">{bot.id.slice(0, 12)}…</span>
             </div>
             {bot.send_disabled_reason ? (
@@ -515,6 +523,13 @@ export function BotDetailPage() {
                           <Badge variant="secondary" className="text-[10px] shrink-0">
                             已安装
                           </Badge>
+                        ) : app.listing === "listed_readonly" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] text-amber-600 border-amber-500 shrink-0"
+                          >
+                            仅展示
+                          </Badge>
                         ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
@@ -528,6 +543,15 @@ export function BotDetailPage() {
                     ) : null}
                     {installedOnBot.has(app.id) ? (
                       <span className="text-[11px] text-muted-foreground/50 shrink-0">已安装</span>
+                    ) : app.listing === "listed" || app.listing === "listed_readonly" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 gap-1.5"
+                        onClick={() => handleInstallApp(app)}
+                      >
+                        安装
+                      </Button>
                     ) : (
                       <Button
                         size="sm"
@@ -568,6 +592,13 @@ export function BotDetailPage() {
                           <Badge variant="secondary" className="text-[10px] shrink-0">
                             已安装
                           </Badge>
+                        ) : app.listing === "listed_readonly" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] text-amber-600 border-amber-500 shrink-0"
+                          >
+                            仅展示
+                          </Badge>
                         ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
@@ -576,6 +607,15 @@ export function BotDetailPage() {
                     </div>
                     {installedOnBot.has(app.id) ? (
                       <span className="text-[11px] text-muted-foreground/50 shrink-0">已安装</span>
+                    ) : app.listing === "listed" || app.listing === "listed_readonly" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 gap-1.5"
+                        onClick={() => handleInstallApp(app)}
+                      >
+                        安装
+                      </Button>
                     ) : (
                       <Button
                         size="sm"

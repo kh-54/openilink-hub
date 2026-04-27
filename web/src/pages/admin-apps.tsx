@@ -27,6 +27,14 @@ export function AdminAppsTab() {
   const reviewMutation = useReviewListing();
   const deleteMutation = useDeleteAdminApp();
 
+  async function setListing(app: any, listing: "listed" | "listed_readonly" | "unlisted") {
+    try {
+      await setListingMutation.mutateAsync({ id: app.id, listing });
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   function openDetail(app: any) {
     setSelected(app);
     setEditing(false);
@@ -34,12 +42,8 @@ export function AdminAppsTab() {
 
   async function toggleListing(e: React.MouseEvent, app: any) {
     e.stopPropagation();
-    const newListing = app.listing === "listed" ? "unlisted" : "listed";
-    try {
-      await setListingMutation.mutateAsync({ id: app.id, listing: newListing });
-    } catch (err: any) {
-      setError(err.message);
-    }
+    const newListing = app.listing === "listed" ? "unlisted" : "listed_readonly";
+    await setListing(app, newListing);
   }
 
   async function handleDelete(app: any) {
@@ -67,7 +71,11 @@ export function AdminAppsTab() {
   }
 
   async function handleReject(app: any) {
-    const reason = await prompt({ title: "拒绝 App", description: "请输入拒绝原因", placeholder: "拒绝原因" });
+    const reason = await prompt({
+      title: "拒绝 App",
+      description: "请输入拒绝原因",
+      placeholder: "拒绝原因",
+    });
     if (!reason) return;
     try {
       await reviewMutation.mutateAsync({ appId: app.id, approve: false, reason });
@@ -99,6 +107,14 @@ export function AdminAppsTab() {
                   {app.listing === "listed" ? (
                     <Badge variant="default" className="text-[10px]">
                       已上架
+                    </Badge>
+                  ) : null}
+                  {app.listing === "listed_readonly" ? (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] text-amber-600 border-amber-500"
+                    >
+                      仅展示
                     </Badge>
                   ) : null}
                   {app.listing === "pending" ? (
@@ -158,6 +174,21 @@ export function AdminAppsTab() {
               >
                 {app.listing === "listed" ? "下架" : "上架"}
               </Button>
+              <Button
+                size="xs"
+                variant={app.listing === "listed_readonly" ? "ghost" : "outline"}
+                className={
+                  app.listing === "listed_readonly"
+                    ? "text-amber-600 bg-amber-500/10 hover:bg-amber-500/20"
+                    : ""
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setListing(app, app.listing === "listed_readonly" ? "listed" : "listed_readonly");
+                }}
+              >
+                仅展示
+              </Button>
             </div>
           </div>
         ))}
@@ -191,13 +222,15 @@ export function AdminAppsTab() {
                 onDelete={() => handleDelete(selected)}
                 onClose={() => setSelected(null)}
                 onToggleListing={async () => {
-                  const newListing = selected.listing === "listed" ? "unlisted" : "listed";
-                  try {
-                    await setListingMutation.mutateAsync({ id: selected.id, listing: newListing });
-                    setSelected({ ...selected, listing: newListing });
-                  } catch {
-                    // mutation error handled by react-query
-                  }
+                  const newListing = selected.listing === "listed" ? "unlisted" : "listed_readonly";
+                  await setListing(selected, newListing);
+                  setSelected({ ...selected, listing: newListing });
+                }}
+                onToggleReadonly={async () => {
+                  const newListing =
+                    selected.listing === "listed_readonly" ? "listed" : "listed_readonly";
+                  await setListing(selected, newListing);
+                  setSelected({ ...selected, listing: newListing });
                 }}
               />
             )
@@ -214,12 +247,14 @@ function AppDetailView({
   onDelete,
   onClose,
   onToggleListing,
+  onToggleReadonly,
 }: {
   app: any;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
   onToggleListing: () => void;
+  onToggleReadonly: () => void;
 }) {
   const tools = (app.tools || []) as any[];
   const events = (app.events || []) as string[];
@@ -312,6 +347,9 @@ function AppDetailView({
           </Button>
           <Button variant="outline" size="sm" onClick={onToggleListing}>
             {app.listing === "listed" ? "下架" : "上架"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onToggleReadonly}>
+            {app.listing === "listed_readonly" ? "取消仅展示" : "设为仅展示"}
           </Button>
         </div>
         <div className="flex gap-2">

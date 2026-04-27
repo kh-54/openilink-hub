@@ -26,7 +26,15 @@ import { useTheme, type Theme } from "../lib/theme";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { useUser } from "@/hooks/use-auth";
-import { useOAuthAccounts, useOAuthProviders, usePasskeys, useDeletePasskey, useRenamePasskey, useUnlinkOAuth, useUpdateUsername } from "@/hooks/use-settings";
+import {
+  useOAuthAccounts,
+  useOAuthProviders,
+  usePasskeys,
+  useDeletePasskey,
+  useRenamePasskey,
+  useUnlinkOAuth,
+  useUpdateUsername,
+} from "@/hooks/use-settings";
 
 const THEME_OPTIONS = [
   { value: "light", label: "浅色", icon: Sun },
@@ -35,7 +43,7 @@ const THEME_OPTIONS = [
 ] as const;
 
 const providerLabels: Record<string, { label: string; icon: any }> = {
-  github: { label: "GitHub", icon: Github },
+  github: { label: "Home", icon: Github },
   linuxdo: { label: "LinuxDo", icon: ShieldCheck },
 };
 
@@ -128,7 +136,9 @@ export function SettingsPage() {
           </Card>
           {oauthProvidersError || oauthAccountsError ? (
             <Card className="border-destructive/20">
-              <CardContent className="p-4 text-sm text-destructive">第三方账号信息加载失败</CardContent>
+              <CardContent className="p-4 text-sm text-destructive">
+                第三方账号信息加载失败
+              </CardContent>
             </Card>
           ) : oauthProviders.length > 0 ? (
             <Card className="border-border/50">
@@ -141,7 +151,8 @@ export function SettingsPage() {
                   const account = oauthAccounts.find((a) => a.provider === providerKey);
                   const linked = !!account;
                   const Icon = providerLabels[provider.name]?.icon || ShieldCheck;
-                  const label = providerLabels[provider.name]?.label || provider.display_name || provider.name;
+                  const label =
+                    providerLabels[provider.name]?.label || provider.display_name || provider.name;
                   return (
                     <div
                       key={provider.name}
@@ -153,9 +164,7 @@ export function SettingsPage() {
                           <Icon className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="text-sm font-bold uppercase">
-                            {label}
-                          </p>
+                          <p className="text-sm font-bold uppercase">{label}</p>
                           <p className="text-xs text-muted-foreground">
                             {linked ? `已关联：${account.username}` : "未连接"}
                           </p>
@@ -186,7 +195,10 @@ export function SettingsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() =>
-                            (window.location.href = provider.type === "oidc" ? `/api/me/oidc/${provider.name}/bind` : `/api/me/linked-accounts/${provider.name}/bind`)
+                            (window.location.href =
+                              provider.type === "oidc"
+                                ? `/api/me/oidc/${provider.name}/bind`
+                                : `/api/me/linked-accounts/${provider.name}/bind`)
                           }
                         >
                           <Link2 className="h-3.5 w-3.5 mr-2" /> 绑定
@@ -235,8 +247,13 @@ export function SettingsPage() {
 
 const usernameRegex = /^[a-z0-9][a-z0-9_-]*[a-z0-9]$/;
 const reservedUsernames = new Set([
-  "admin", "administrator", "superadmin",
-  "root", "system", "api", "support",
+  "admin",
+  "administrator",
+  "superadmin",
+  "root",
+  "system",
+  "api",
+  "support",
 ]);
 
 function UsernameEditor({ username }: { username?: string }) {
@@ -276,13 +293,22 @@ function UsernameEditor({ username }: { username?: string }) {
       <div className="flex gap-2">
         <Input
           value={value}
-          onChange={(e) => { setValue(e.target.value.toLowerCase()); setError(""); setSuccess(""); }}
+          onChange={(e) => {
+            setValue(e.target.value.toLowerCase());
+            setError("");
+            setSuccess("");
+          }}
           className="font-mono"
           maxLength={32}
           placeholder="your-username"
         />
         {changed && (
-          <Button size="sm" className="shrink-0" onClick={handleSave} disabled={updateUsername.isPending}>
+          <Button
+            size="sm"
+            className="shrink-0"
+            onClick={handleSave}
+            disabled={updateUsername.isPending}
+          >
             {updateUsername.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存"}
           </Button>
         )}
@@ -413,7 +439,10 @@ function ChangePasswordSection({ hasPassword }: { hasPassword?: boolean }) {
 
 const isXiaomiDevice = () => /xiaomi|redmi|miui|hyperos/i.test(navigator.userAgent);
 
-function PasskeyNameEditor({ passkey, onError }: {
+function PasskeyNameEditor({
+  passkey,
+  onError,
+}: {
   passkey: { id: string; name: string };
   onError: (msg: string) => void;
 }) {
@@ -433,10 +462,13 @@ function PasskeyNameEditor({ passkey, onError }: {
       setEditing(false);
       return;
     }
-    renamePasskey.mutate({ id: passkey.id, name: trimmed }, {
-      onSuccess: () => setEditing(false),
-      onError: (e: any) => onError(e.message || "重命名失败"),
-    });
+    renamePasskey.mutate(
+      { id: passkey.id, name: trimmed },
+      {
+        onSuccess: () => setEditing(false),
+        onError: (e: any) => onError(e.message || "重命名失败"),
+      },
+    );
   }
 
   if (editing) {
@@ -448,7 +480,10 @@ function PasskeyNameEditor({ passkey, onError }: {
         onBlur={save}
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
-          if (e.key === "Escape") { setValue(passkey.name || "Passkey"); setEditing(false); }
+          if (e.key === "Escape") {
+            setValue(passkey.name || "Passkey");
+            setEditing(false);
+          }
         }}
         className="h-6 text-xs font-bold px-1.5 py-0 w-32 bg-muted/30"
         maxLength={50}
@@ -532,7 +567,13 @@ function PasskeySection() {
             使用生物识别（指纹、Face ID）或安全密钥进行登录，更安全、更快捷。
           </CardDescription>
         </div>
-        <Button size="sm" onClick={handleAdd} disabled={adding || !supportsPasskey} className="h-9" title={supportsPasskey ? undefined : "需要 HTTPS 安全连接才能使用通行密钥"}>
+        <Button
+          size="sm"
+          onClick={handleAdd}
+          disabled={adding || !supportsPasskey}
+          className="h-9"
+          title={supportsPasskey ? undefined : "需要 HTTPS 安全连接才能使用通行密钥"}
+        >
           {adding ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -567,16 +608,29 @@ function PasskeySection() {
               小米 / 红米设备请先确认以下设置
             </p>
             <ol className="list-decimal ml-4 space-y-1.5 leading-relaxed">
-              <li>打开 <b>设置 &gt; 指纹、面部与密码 &gt; 智能密码管理</b>，<b>关闭</b>"自动填充密码与通行密钥"</li>
-              <li>打开 <b>设置 &gt; 更多设置 &gt; 语言与输入法 &gt; 密码与账号</b>，将"首选服务"设为 <b>Google</b> 或 <b>小米智能密码管理</b></li>
+              <li>
+                打开 <b>设置 &gt; 指纹、面部与密码 &gt; 智能密码管理</b>，<b>关闭</b>
+                "自动填充密码与通行密钥"
+              </li>
+              <li>
+                打开 <b>设置 &gt; 更多设置 &gt; 语言与输入法 &gt; 密码与账号</b>，将"首选服务"设为{" "}
+                <b>Google</b> 或 <b>小米智能密码管理</b>
+              </li>
               <li>确保 Google Play 服务已更新到最新版本</li>
             </ol>
-            <p className="text-[10px] text-muted-foreground">设置完成后，点击下方按钮继续注册。如果注册后无法登录，请检查密码管理器中是否有保存的通行密钥。</p>
+            <p className="text-[10px] text-muted-foreground">
+              设置完成后，点击下方按钮继续注册。如果注册后无法登录，请检查密码管理器中是否有保存的通行密钥。
+            </p>
             <div className="flex gap-2 pt-1">
               <Button size="sm" className="h-7 text-xs" onClick={handleAdd}>
                 已确认，继续注册
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowXiaomiGuide(false)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => setShowXiaomiGuide(false)}
+              >
                 取消
               </Button>
             </div>
@@ -600,10 +654,7 @@ function PasskeySection() {
                     <Smartphone className="h-5 w-5" />
                   </div>
                   <div>
-                    <PasskeyNameEditor
-                      passkey={pk}
-                      onError={(msg) => setError(msg)}
-                    />
+                    <PasskeyNameEditor passkey={pk} onError={(msg) => setError(msg)} />
                     <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 uppercase font-medium">
                       <Clock className="h-2.5 w-2.5" />{" "}
                       {new Date(pk.created_at * 1000).toLocaleDateString()} 绑定

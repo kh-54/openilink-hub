@@ -292,9 +292,10 @@ func (s *Server) handleGetApp(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	// Owner can see everything; others can see listed apps or apps they have installed
+	// Owner can see everything; others can see public apps or apps they have installed.
 	if app.OwnerID != userID {
-		if app.Listing != "listed" && !s.userHasInstallation(userID, appID) {
+		isPublic := app.Listing == "listed" || app.Listing == "listed_readonly"
+		if !isPublic && !s.userHasInstallation(userID, appID) {
 			jsonError(w, "not found", http.StatusNotFound)
 			return
 		}
@@ -635,7 +636,7 @@ func (s *Server) handleReviewListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Approve {
-		err = s.Store.ReviewListing(appID, true, "")
+		err = s.Store.TransitionListingWithCleanup(appID, "listed_readonly", "")
 	} else {
 		err = s.Store.TransitionListingWithCleanup(appID, "rejected", req.Reason)
 	}
@@ -711,8 +712,8 @@ func (s *Server) requireApp(w http.ResponseWriter, r *http.Request) *store.App {
 	return app
 }
 
-// requireAppForInstall loads an app that the user can install:
-// either they own it, or it's publicly listed.
+// requireAppForInstall loads an app that the user can access for install flow:
+// either they own it, or it's publicly visible in marketplace.
 func (s *Server) requireAppForInstall(w http.ResponseWriter, r *http.Request) *store.App {
 	userID := auth.UserIDFromContext(r.Context())
 	appID := r.PathValue("id")
@@ -722,10 +723,11 @@ func (s *Server) requireAppForInstall(w http.ResponseWriter, r *http.Request) *s
 		jsonError(w, "not found", http.StatusNotFound)
 		return nil
 	}
-	// Admin can access all apps; otherwise must be owner or listed
+	// Admin can access all apps; otherwise must be owner or publicly visible.
 	user, _ := s.Store.GetUserByID(userID)
 	isAdmin := user != nil && store.IsAdmin(user.Role)
-	if !isAdmin && app.OwnerID != userID && app.Listing != "listed" {
+	isPublic := app.Listing == "listed" || app.Listing == "listed_readonly"
+	if !isAdmin && app.OwnerID != userID && !isPublic {
 		jsonError(w, "not found", http.StatusNotFound)
 		return nil
 	}
@@ -733,7 +735,7 @@ func (s *Server) requireAppForInstall(w http.ResponseWriter, r *http.Request) *s
 }
 
 // PUT /api/admin/apps/{id}/listing — admin directly sets listing status
-// PUT /api/admin/apps/{id}/listing — admin directly sets listing status (listed/unlisted).
+// PUT /api/admin/apps/{id}/listing — admin directly sets listing status (listed/unlisted/listed_readonly).
 // This is an admin privilege bypass of the normal review flow, intended for
 // moderation actions (e.g. emergency takedown, re-listing without re-review).
 func (s *Server) handleAdminSetListing(w http.ResponseWriter, r *http.Request) {
@@ -745,9 +747,9 @@ func (s *Server) handleAdminSetListing(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	validListings := map[string]bool{"listed": true, "unlisted": true}
+	validListings := map[string]bool{"listed": true, "unlisted": true, "listed_readonly": true}
 	if !validListings[req.Listing] {
-		jsonError(w, "listing must be 'listed' or 'unlisted'", http.StatusBadRequest)
+		jsonError(w, "listing must be 'listed', 'listed_readonly', or 'unlisted'", http.StatusBadRequest)
 		return
 	}
 	app, err := s.Store.GetApp(appID)

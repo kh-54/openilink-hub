@@ -134,7 +134,7 @@ func (db *DB) ListListedApps() ([]store.App, error) {
 		EXTRACT(EPOCH FROM a.created_at)::BIGINT, EXTRACT(EPOCH FROM a.updated_at)::BIGINT,
 		COALESCE(u.username, '')
 		FROM apps a LEFT JOIN users u ON u.id = a.owner_id
-		WHERE a.listing = 'listed' AND a.status = 'active' ORDER BY a.name`)
+		WHERE a.listing IN ('listed', 'listed_readonly') AND a.status = 'active' ORDER BY a.name`)
 	if err != nil {
 		return nil, err
 	}

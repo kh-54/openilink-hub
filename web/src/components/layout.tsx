@@ -221,16 +221,12 @@ function LayoutHeader() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
-                <a
-                  href="https://github.com/openilink/openilink-hub"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Github className="h-4 w-4" />
+                <a href="/" target="_blank" rel="noopener noreferrer">
+                  <House className="h-4 w-4" />
                 </a>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>GitHub 项目</TooltipContent>
+            <TooltipContent>Home 项目</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>

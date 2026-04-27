@@ -111,6 +111,14 @@ export function InstallAppPage() {
   }, [waitingForOAuth, oauthPopup, botId, appId, navigate, toast]);
 
   async function handleInstall() {
+    if (app?.listing === "listed" || app?.listing === "listed_readonly") {
+      toast({
+        variant: "destructive",
+        title: "无权限",
+        description: `应用「${app.name}」不允许安装`,
+      });
+      return;
+    }
     setInstalling(true);
     try {
       const result = await api.installApp(appId!, {

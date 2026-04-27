@@ -634,7 +634,7 @@ function TokenSection({ app, inst }: { app: any; inst: any }) {
             <details className="group">
               <summary className="text-sm font-medium cursor-pointer flex items-center gap-2 select-none">
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-                WebSocket 连接
+                连接
               </summary>
               <pre className="mt-2 p-3 rounded-md bg-muted/30 border text-xs font-mono overflow-x-auto whitespace-pre-wrap">
                 {`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/bot/v1/ws?token=${token || "<your_token>"}`}
@@ -644,7 +644,7 @@ function TokenSection({ app, inst }: { app: any; inst: any }) {
             <details className="group">
               <summary className="text-sm font-medium cursor-pointer flex items-center gap-2 select-none">
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-                HTTP 发消息
+                发消息
               </summary>
               <pre className="mt-2 p-3 rounded-md bg-muted/30 border text-xs font-mono overflow-x-auto whitespace-pre-wrap">
                 {`curl -X POST ${hubUrl}/bot/v1/message/send \\\n  -H "Authorization: Bearer ${token || "<your_token>"}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"content":"hello"}'`}
@@ -744,7 +744,15 @@ function AppConfigForm({ app, inst, onUpdate }: { app: any; inst: any; onUpdate:
 
 // ==================== Config Section ====================
 
-function ConfigSection({ inst, onUninstall, queryClient }: { inst: any; onUninstall: () => void; queryClient: QueryClient }) {
+function ConfigSection({
+  inst,
+  onUninstall,
+  queryClient,
+}: {
+  inst: any;
+  onUninstall: () => void;
+  queryClient: QueryClient;
+}) {
   const { toast } = useToast();
   const [showUninstallDialog, setShowUninstallDialog] = useState(false);
   const [uninstalling, setUninstalling] = useState(false);
@@ -869,26 +877,30 @@ function EventLogsSection({
       </div>
 
       {/* Show hint when logs contain 403/4xx errors */}
-      {!loading && logs.some((l) => {
-        const code = l.status_code || l.status;
-        return code >= 400 && code < 500;
-      }) && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30 p-3 text-xs text-muted-foreground space-y-1">
-          <p className="font-medium text-orange-700 dark:text-orange-400">部分事件投递失败</p>
-          <p>如果应用来自远程市场，4xx 错误通常是远程应用服务器的配置问题。请联系应用开发者确认 Webhook 地址和权限配置是否正确。</p>
-          {homepage ? (
-            <a
-              href={homepage}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-orange-700 hover:underline dark:text-orange-400"
-            >
-              <ExternalLink className="h-3 w-3" />
-              前往应用主页
-            </a>
-          ) : null}
-        </div>
-      )}
+      {!loading &&
+        logs.some((l) => {
+          const code = l.status_code || l.status;
+          return code >= 400 && code < 500;
+        }) && (
+          <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30 p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-orange-700 dark:text-orange-400">部分事件投递失败</p>
+            <p>
+              如果应用来自远程市场，4xx 错误通常是远程应用服务器的配置问题。请联系应用开发者确认
+              Webhook 地址和权限配置是否正确。
+            </p>
+            {homepage ? (
+              <a
+                href={homepage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-orange-700 hover:underline dark:text-orange-400"
+              >
+                <ExternalLink className="h-3 w-3" />
+                前往应用主页
+              </a>
+            ) : null}
+          </div>
+        )}
 
       <Card className="overflow-hidden">
         {loading ? (

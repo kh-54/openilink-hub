@@ -160,7 +160,7 @@ func (s *Server) completeScanLogin(result *provider.BindPollResult, sendEvent fu
 		}
 	}
 
-	// 3. Still no match → create a new Hub user (username: ilink_<bot_id_prefix>)
+	// 3. Still no match → create a new Hub user (username: wechat_<bot_id_prefix>)
 	if userID == "" {
 		// Check registration gate (always allow first user for bootstrap)
 		count, _ := s.Store.UserCount()
@@ -172,14 +172,14 @@ func (s *Server) completeScanLogin(result *provider.BindPollResult, sendEvent fu
 		if len(suffix) > 8 {
 			suffix = suffix[:8]
 		}
-		user, err := s.Store.CreateUser("ilink_"+suffix, "iLink User")
+		user, err := s.Store.CreateUser("wechat_"+suffix, "WeChat User")
 		if err != nil {
 			slog.Error("scan-login create user failed", "err", err)
 			sendEvent("error", `{"message":"create user failed"}`)
 			return
 		}
 		userID = user.ID
-		slog.Info("scan-login auto-created user", "user", userID, "ilink_user_id", creds.ILinkUserID)
+		slog.Info("scan-login auto-created user", "user", userID, "wechat_user_id", creds.ILinkUserID)
 	}
 
 	// Verify user is active

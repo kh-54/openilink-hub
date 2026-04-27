@@ -219,7 +219,10 @@ export const api = {
   // Admin: Apps
   adminListApps: () => request<any[]>("/api/admin/apps"),
   setAppListing: (id: string, listing: string) =>
-    request(`/api/admin/apps/${id}/listing`, { method: "PUT", body: JSON.stringify({ listing }) }),
+    request(`/api/admin/apps/${id}/listing`, {
+      method: "PUT",
+      body: JSON.stringify({ listing }),
+    }),
 
   // App Installations
   installApp: (appId: string, data: any) =>

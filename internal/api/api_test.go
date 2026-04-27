@@ -488,6 +488,23 @@ func TestInstallApp(t *testing.T) {
 			t.Errorf("expected 404 for nonexistent bot, got %d", resp.StatusCode)
 		}
 	})
+
+	t.Run("listed_readonly app returns 403", func(t *testing.T) {
+		app := createTestApp(t, env.store, env.user.ID, "ReadOnly App", "readonly-app",
+			[]string{"message:write"})
+		if err := env.store.SetListing(app.ID, "listed_readonly"); err != nil {
+			t.Fatalf("set listing readonly: %v", err)
+		}
+
+		resp := doJSON(t, env.ts, "POST", "/api/apps/"+app.ID+"/install", map[string]any{
+			"bot_id": bot.ID,
+		}, withCookie(env.cookie))
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("expected 403 for listed_readonly app, got %d", resp.StatusCode)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
-import { HexagonBackground } from "../components/ui/hexagon-background";
 import { cn } from "../lib/utils";
 import { Bot, Webhook, Cable, Shield, Zap } from "lucide-react";
 import { useUser } from "@/hooks/use-auth";
@@ -45,8 +44,6 @@ export function HomePage() {
 
   return (
     <div className="relative isolate flex min-h-screen flex-col overflow-x-hidden bg-background">
-      <HexagonBackground className="opacity-90" hexagonSize={84} hexagonMargin={5} />
-
       <div
         className={cn(
           "absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_42%),radial-gradient(circle_at_50%_12%,rgba(255,255,255,0.08),transparent_50%)] transition-opacity duration-500",
@@ -94,8 +91,7 @@ export function HomePage() {
         <section className="mx-auto max-w-3xl px-6 py-20 text-center sm:px-8 sm:py-24 lg:py-28">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">WeChat</h1>
           <p className="mt-5 text-base leading-8 text-muted-foreground sm:text-lg">
-            微信 Bot 管理与消息中继平台。连接你的微信，通过 WebSocket、HTTP API 或 Webhook
-            接收和发送消息。
+            微信 Bot 管理与消息中继平台。连接你的微信，接收和发送消息。
           </p>
           <div className="mt-8 flex justify-center gap-4 sm:mt-10">
             <Link to={loggedIn ? "/dashboard" : "/login"}>
@@ -103,16 +99,16 @@ export function HomePage() {
                 开始使用
               </Button>
             </Link>
-            <a href="https://github.com/openilink/openilink-hub" target="_blank" rel="noopener">
+            <a href="/" target="_blank" rel="noopener">
               <Button variant="outline" size="lg" className="px-5 text-sm">
-                GitHub
+                Home
               </Button>
             </a>
           </div>
         </section>
 
         {/* Features */}
-        <section className="mx-auto max-w-6xl px-6 sm:px-8">
+        {/* <section className="mx-auto max-w-6xl px-6 sm:px-8">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {features.map((f) => (
               <Card
@@ -127,17 +123,17 @@ export function HomePage() {
               </Card>
             ))}
           </div>
-        </section>
+        </section> */}
 
         {/* How it works */}
-        <section className="mx-auto max-w-3xl px-6 pt-6 sm:px-8 sm:pt-8">
+        {/* <section className="mx-auto max-w-3xl px-6 pt-6 sm:px-8 sm:pt-8">
           <h2 className="mb-10 text-center text-2xl font-semibold tracking-tight">工作流程</h2>
           <div className="space-y-7 text-base">
             {[
               {
                 step: "1",
                 title: "扫码登录",
-                desc: "在 Hub 中扫码登录你的微信账号",
+                desc: "扫码登录你的微信账号",
               },
               {
                 step: "2",
@@ -161,16 +157,11 @@ export function HomePage() {
               </div>
             ))}
           </div>
-        </section>
+        </section> */}
       </main>
 
       <footer className="relative z-10 border-t border-white/8 px-6 py-6 text-center text-sm text-muted-foreground sm:px-8">
-        <a
-          href="https://github.com/openilink/openilink-hub"
-          target="_blank"
-          rel="noopener"
-          className="hover:text-primary"
-        >
+        <a href="/" target="_blank" rel="noopener" className="hover:text-primary">
           WeChat
         </a>
         {" · "}微信消息平台

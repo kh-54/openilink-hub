@@ -129,7 +129,18 @@ export function AppsPage() {
             ))}
           </TabsList>
           <TabsContent value="local" className="mt-6">
-            <AppGrid apps={filterApps(listedApps)} search={search} onInstall={setPendingApp} />
+            <AppGrid
+              apps={filterApps(listedApps)}
+              search={search}
+              onInstall={setPendingApp}
+              onDenied={(app) =>
+                toast({
+                  variant: "destructive",
+                  title: "无权限",
+                  description: `应用「${app.name}」不允许安装`,
+                })
+              }
+            />
           </TabsContent>
           {registryNames.map((name) => (
             <TabsContent key={name} value={name} className="mt-6">
@@ -137,12 +148,30 @@ export function AppsPage() {
                 apps={filterApps(registryGroups[name])}
                 search={search}
                 onInstall={setPendingApp}
+                onDenied={(app) =>
+                  toast({
+                    variant: "destructive",
+                    title: "无权限",
+                    description: `应用「${app.name}」不允许安装`,
+                  })
+                }
               />
             </TabsContent>
           ))}
         </Tabs>
       ) : (
-        <AppGrid apps={filterApps(listedApps)} search={search} onInstall={setPendingApp} />
+        <AppGrid
+          apps={filterApps(listedApps)}
+          search={search}
+          onInstall={setPendingApp}
+          onDenied={(app) =>
+            toast({
+              variant: "destructive",
+              title: "无权限",
+              description: `应用「${app.name}」不允许安装`,
+            })
+          }
+        />
       )}
 
       <Dialog open={!!pendingApp} onOpenChange={(o) => !o && setPendingApp(null)}>
@@ -184,10 +213,12 @@ function AppGrid({
   apps,
   search,
   onInstall,
+  onDenied,
 }: {
   apps: any[];
   search: string;
   onInstall: (app: any) => void;
+  onDenied: (app: any) => void;
 }) {
   if (apps.length === 0) {
     return (
@@ -218,6 +249,10 @@ function AppGrid({
                 <Badge variant="secondary" className="text-[10px] shrink-0">
                   已安装
                 </Badge>
+              ) : app.listing === "listed_readonly" ? (
+                <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500">
+                  仅展示
+                </Badge>
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
@@ -246,6 +281,15 @@ function AppGrid({
             </Button>
           ) : app.installed ? (
             <span className="text-[11px] text-muted-foreground/50 shrink-0">已安装</span>
+          ) : app.listing === "listed" || app.listing === "listed_readonly" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 gap-1.5"
+              onClick={() => onDenied(app)}
+            >
+              安装
+            </Button>
           ) : (
             <Button
               size="sm"

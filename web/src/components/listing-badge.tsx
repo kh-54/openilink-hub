@@ -2,6 +2,12 @@ import { Badge } from "@/components/ui/badge";
 
 export function ListingBadge({ listing }: { listing?: string }) {
   if (listing === "listed") return <Badge variant="default">已上架</Badge>;
+  if (listing === "listed_readonly")
+    return (
+      <Badge variant="outline" className="text-amber-600 border-amber-500">
+        仅展示
+      </Badge>
+    );
   if (listing === "pending")
     return (
       <Badge variant="outline" className="text-orange-500 border-orange-500">

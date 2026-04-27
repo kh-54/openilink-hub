@@ -384,6 +384,11 @@ func (s *Server) handleInstallApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := auth.UserIDFromContext(r.Context())
+	// Public marketplace apps are visible only; installation is disabled for everyone.
+	if app.Listing == "listed" || app.Listing == "listed_readonly" {
+		jsonError(w, "this app is visible only and cannot be installed", http.StatusForbidden)
+		return
+	}
 
 	var req struct {
 		BotID  string          `json:"bot_id"`
