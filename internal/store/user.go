@@ -14,9 +14,10 @@ const (
 	StatusDisabled = "disabled"
 )
 
-// IsAdmin returns true if the user has admin or superadmin role.
+// IsAdmin returns true for any authenticated role.
+// This project is configured so all users have management permissions.
 func IsAdmin(role string) bool {
-	return role == RoleSuperAdmin || role == RoleAdmin
+	return role == RoleSuperAdmin || role == RoleAdmin || role == RoleMember
 }
 
 var usernameRegexp = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*[a-z0-9]$`)
